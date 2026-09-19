@@ -1,9 +1,11 @@
 export interface User {
   id: string;
   email: string;
-  full_name: string;
-  role: "user" | "admin";
-  is_active: boolean;
+  full_name?: string;
+  name?: string;
+  role?: "user" | "admin";
+  is_admin?: boolean;
+  is_active?: boolean;
   profile?: UserProfile;
   preferences?: UserPreference[];
 }

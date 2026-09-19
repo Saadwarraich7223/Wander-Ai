@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Compass, Plus, Trash2, ShieldCheck, MapPin, RefreshCw, Edit3, Image as ImageIcon, Search, X, Check, ExternalLink } from "lucide-react";
-import { api } from "@/lib/api";
-import { PlaceSummary } from "@/types";
+import { useRouter } from "next/navigation";
+import { Compass, Plus, Trash2, ShieldCheck, MapPin, RefreshCw, Edit3, Image as ImageIcon, Search, X, Check, ExternalLink, ShieldAlert } from "lucide-react";
+import { api, usersApi } from "@/lib/api";
+import { authStorage } from "@/lib/auth";
+import { PlaceSummary, User } from "@/types";
 
 interface EditModalState {
   isOpen: boolean;
@@ -19,10 +21,44 @@ interface EditModalState {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [places, setPlaces] = useState<PlaceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
+
+  useEffect(() => {
+    const user = authStorage.getUser();
+    const token = authStorage.getAccessToken();
+
+    if (!token && !user) {
+      router.push("/login?redirect=/admin");
+      return;
+    }
+
+    setCurrentUser(user);
+
+    async function verifyAdmin() {
+      try {
+        const me = await usersApi.getMe();
+        if (me) {
+          const hasAdmin = Boolean(me.is_admin || me.role === "admin");
+          setIsAdmin(hasAdmin);
+        } else {
+          setIsAdmin(Boolean(user?.is_admin || user?.role === "admin"));
+        }
+      } catch (err) {
+        setIsAdmin(Boolean(user?.is_admin || user?.role === "admin"));
+      } finally {
+        setAuthLoading(false);
+      }
+    }
+
+    verifyAdmin();
+  }, [router]);
 
   const [editModal, setEditModal] = useState<EditModalState>({
     isOpen: false,
@@ -122,6 +158,44 @@ export default function AdminPage() {
       p.category?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.slug.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#090d16] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin mb-4" />
+        <h2 className="font-bold text-lg text-white">Verifying Admin Credentials</h2>
+        <p className="text-xs text-slate-400 mt-1">Authenticating access to Destination Studio...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#090d16] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mb-4">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="font-bold text-xl text-white mb-2">Administrator Access Required</h2>
+        <p className="text-sm text-slate-400 max-w-md mb-6">
+          The Destination Studio is restricted to administrator accounts. Please log in with an admin profile to manage places.
+        </p>
+        <div className="flex gap-3">
+          <Link
+            href="/profile"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 text-white hover:bg-slate-700 text-xs font-semibold"
+          >
+            Back to Profile
+          </Link>
+          <Link
+            href="/explore"
+            className="px-4 py-2.5 rounded-xl bg-emerald-500 text-slate-950 hover:bg-emerald-400 text-xs font-bold"
+          >
+            Explore Destinations
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#090d16] text-white flex flex-col font-sans">

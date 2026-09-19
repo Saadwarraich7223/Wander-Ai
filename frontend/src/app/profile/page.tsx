@@ -473,15 +473,17 @@ export default function UserProfilePage() {
 
                 {/* Quick Actions */}
                 <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                  {/* Direct Link to Admin Panel */}
-                  <Link
-                    href="/admin"
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-emerald-400 hover:bg-slate-800 transition-colors font-semibold text-xs border border-emerald-500/30 shadow-xs cursor-pointer"
-                    title="Access Destination Studio & Content Management"
-                  >
-                    <span className="material-symbols-outlined text-base">admin_panel_settings</span>
-                    <span>Admin Studio</span>
-                  </Link>
+                  {/* Direct Link to Admin Panel - Visible only to admins */}
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-emerald-400 hover:bg-slate-800 transition-colors font-semibold text-xs border border-emerald-500/30 shadow-xs cursor-pointer"
+                      title="Access Destination Studio & Content Management"
+                    >
+                      <span className="material-symbols-outlined text-base">admin_panel_settings</span>
+                      <span>Admin Studio</span>
+                    </Link>
+                  )}
 
                   <button
                     onClick={() => {
@@ -1122,40 +1124,42 @@ export default function UserProfilePage() {
 
               {/* RIGHT COLUMN: Admin Quick Access & Hardware Security (4 Cols) */}
               <div className="lg:col-span-4 flex flex-col gap-6">
-                {/* Admin Studio Quick Card */}
-                <div className="bg-slate-950 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col gap-4 relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
-                      Destination Studio
-                    </span>
-                    <span className="material-symbols-outlined text-emerald-400 text-lg">admin_panel_settings</span>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-white">Admin Studio &amp; Catalog</h3>
-                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Manage Pakistan's 140+ destination database, add new places, update photos, edit pricing, and adjust coordinates in real time.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-slate-900/80 rounded-xl flex items-center justify-between text-xs border border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-base text-emerald-400">database</span>
-                      <div>
-                        <div className="font-bold text-xs text-white">141+ Live Destinations</div>
-                        <div className="text-slate-400 text-[11px]">Cloud PostgreSQL Database</div>
-                      </div>
+                {/* Admin Studio Quick Card - Visible only to admins */}
+                {isAdmin && (
+                  <div className="bg-slate-950 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col gap-4 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
+                        Destination Studio
+                      </span>
+                      <span className="material-symbols-outlined text-emerald-400 text-lg">admin_panel_settings</span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
-                      READY
-                    </span>
+                    <div>
+                      <h3 className="font-display font-bold text-lg text-white">Admin Studio &amp; Catalog</h3>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        Manage Pakistan's 140+ destination database, add new places, update photos, edit pricing, and adjust coordinates in real time.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-900/80 rounded-xl flex items-center justify-between text-xs border border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-base text-emerald-400">database</span>
+                        <div>
+                          <div className="font-bold text-xs text-white">141+ Live Destinations</div>
+                          <div className="text-slate-400 text-[11px]">Cloud PostgreSQL Database</div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
+                        READY
+                      </span>
+                    </div>
+                    <Link
+                      href="/admin"
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span className="material-symbols-outlined text-sm">dashboard</span>
+                      <span>Open Admin Studio (/admin)</span>
+                    </Link>
                   </div>
-                  <Link
-                    href="/admin"
-                    className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-sm">dashboard</span>
-                    <span>Open Admin Studio (/admin)</span>
-                  </Link>
-                </div>
+                )}
 
                 {/* Quick Bookmarks & Offline Sync Card */}
                 <div className="bg-surface-container-lowest rounded-3xl p-6 shadow-xs border border-outline-variant/60 flex flex-col gap-4">

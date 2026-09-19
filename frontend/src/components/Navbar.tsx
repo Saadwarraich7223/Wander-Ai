@@ -86,6 +86,10 @@ export default function Navbar({
     currentUser && (currentUser.full_name || (currentUser as any).id || (currentUser as any).email)
   );
 
+  const isAdmin = Boolean(
+    (currentUser as any)?.is_admin || (currentUser as any)?.role === "admin"
+  );
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 px-2.5 sm:px-8 py-2.5 sm:py-3.5 transition-all">
       <div className="max-w-[1440px] mx-auto bg-surface-container-lowest/90 backdrop-blur-xl border border-outline-variant/70 rounded-2xl shadow-luxury px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
@@ -174,6 +178,17 @@ export default function Navbar({
               </span>
             )}
           </Link>
+
+          {isAdmin && (
+            <Link
+              className="hidden md:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
+              href="/admin"
+              title="Destination Catalog & Admin Studio"
+            >
+              <span className="material-symbols-outlined text-sm text-emerald-600">admin_panel_settings</span>
+              <span>Admin Studio</span>
+            </Link>
+          )}
 
           {onPlanTrip ? (
             <button onClick={onPlanTrip} className={ctaClass} type="button">
@@ -316,17 +331,19 @@ export default function Navbar({
                 </span>
                 <span className="text-xs text-on-surface-variant">{currentUser?.full_name || "Account"}</span>
               </Link>
-              <Link
-                href="/admin"
-                onClick={closeDrawer}
-                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-lg text-emerald-600">admin_panel_settings</span>
-                  <span>Admin Studio</span>
-                </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 font-bold">PANEL</span>
-              </Link>
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={closeDrawer}
+                  className="py-2.5 px-3 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-lg text-emerald-600">admin_panel_settings</span>
+                    <span>Admin Studio</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 font-bold">PANEL</span>
+                </Link>
+              )}
             </>
           ) : (
             <div className="flex flex-col gap-1 my-1">
