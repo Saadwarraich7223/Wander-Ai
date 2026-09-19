@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { authStorage } from "@/lib/auth";
 import { usersApi, tripsApi, placesApi, interactionsApi, getErrorMessage } from "@/lib/api";
@@ -126,7 +127,9 @@ const FALLBACK_PLACES: PlaceBookmark[] = [
 ];
 
 export default function UserProfilePage() {
+  const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [meData, setMeData] = useState<any>(null);
 
@@ -160,10 +163,18 @@ export default function UserProfilePage() {
     }, 3200);
   };
 
-  // Load User, Profile, Trips, and Interactions from FastAPI Backend
+  // Check login & Load User, Profile, Trips, and Interactions from FastAPI Backend
   useEffect(() => {
     const loggedUser = authStorage.getUser();
+    const token = authStorage.getAccessToken();
+
+    if (!loggedUser && !token) {
+      router.push("/login?redirect=/profile");
+      return;
+    }
+
     setUser(loggedUser);
+    setAuthChecked(true);
 
     async function loadBackendData() {
       setLoading(true);
@@ -373,6 +384,18 @@ export default function UserProfilePage() {
     if (filterType !== "all" && place.type !== filterType) return false;
     return true;
   });
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center mb-4">
+          <span className="material-symbols-outlined text-2xl animate-spin">progress_activity</span>
+        </div>
+        <h2 className="font-display font-bold text-lg text-on-surface mb-1">Verifying Traveler Session</h2>
+        <p className="text-xs text-on-surface-variant">Accessing your WanderAI travel passport...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background font-sans text-on-surface antialiased flex flex-col relative overflow-x-hidden">

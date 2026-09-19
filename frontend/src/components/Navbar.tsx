@@ -1,8 +1,7 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { authStorage } from "@/lib/auth";
 
 interface NavbarProps {
   onSearch?: () => void;
@@ -45,6 +44,15 @@ export default function Navbar({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hash, setHash] = useState("");
+  const [currentUser, setCurrentUser] = useState<{ full_name?: string | null } | null>(null);
+
+  useEffect(() => {
+    if (user !== undefined) {
+      setCurrentUser(user);
+    } else {
+      setCurrentUser(authStorage.getUser());
+    }
+  }, [user]);
 
   useEffect(() => {
     const update = () => setHash(window.location.hash);
@@ -73,6 +81,10 @@ export default function Navbar({
   const ctaBase =
     "inline-flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs sm:text-sm font-semibold transition-all shadow-sm hover:shadow-glow hover:-translate-y-0.5 cursor-pointer whitespace-nowrap";
   const ctaClass = ctaBase;
+
+  const isLoggedIn = Boolean(
+    currentUser && (currentUser.full_name || (currentUser as any).id || (currentUser as any).email)
+  );
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 px-2.5 sm:px-8 py-2.5 sm:py-3.5 transition-all">
@@ -175,22 +187,31 @@ export default function Navbar({
             </Link>
           )}
 
-          {user === null ? (
-            <Link
-              href="/login"
-              className="text-xs font-semibold text-on-surface-variant hover:text-on-surface px-1.5 py-1 whitespace-nowrap hidden sm:inline"
-            >
-              Log In
-            </Link>
-          ) : (
+          {isLoggedIn ? (
             <Link
               href="/profile"
-              className="flex items-center pl-1 border-l border-outline-variant/60 cursor-pointer"
+              className="flex items-center pl-1.5 border-l border-outline-variant/60 cursor-pointer group"
+              title={currentUser?.full_name || "Profile"}
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-secondary text-white font-bold flex items-center justify-center text-xs shadow-sm">
-                {user?.full_name?.charAt(0) || "WA"}
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-secondary text-white font-bold flex items-center justify-center text-xs shadow-sm group-hover:ring-2 group-hover:ring-secondary/40 transition-all">
+                {currentUser?.full_name ? currentUser.full_name.charAt(0).toUpperCase() : "U"}
               </div>
             </Link>
+          ) : (
+            <div className="flex items-center gap-1 sm:gap-2 pl-1 border-l border-outline-variant/60">
+              <Link
+                href="/login"
+                className="text-xs font-semibold text-on-surface-variant hover:text-on-surface px-2 py-1 rounded-lg hover:bg-surface-container transition-all whitespace-nowrap"
+              >
+                Log In
+              </Link>
+              <Link
+                href="/register"
+                className="hidden sm:inline-flex items-center text-xs font-bold text-secondary bg-secondary/10 hover:bg-secondary/20 px-2.5 py-1 rounded-lg transition-all whitespace-nowrap"
+              >
+                Sign Up
+              </Link>
+            </div>
           )}
 
           {/* Mobile Menu Trigger */}
@@ -282,7 +303,7 @@ export default function Navbar({
             </div>
           )}
 
-          {user ? (
+          {isLoggedIn ? (
             <Link
               href="/profile"
               onClick={closeDrawer}
@@ -292,17 +313,27 @@ export default function Navbar({
                 <span className="material-symbols-outlined text-lg text-secondary">person</span>
                 <span>My Profile</span>
               </span>
-              <span className="text-xs text-on-surface-variant">{user.full_name || "Account"}</span>
+              <span className="text-xs text-on-surface-variant">{currentUser?.full_name || "Account"}</span>
             </Link>
           ) : (
-            <Link
-              href="/login"
-              onClick={closeDrawer}
-              className="py-2.5 px-3 rounded-xl text-sm font-semibold text-secondary hover:bg-secondary/10 flex items-center gap-2.5"
-            >
-              <span className="material-symbols-outlined text-lg text-secondary">login</span>
-              <span>Log In / Sign Up</span>
-            </Link>
+            <div className="flex flex-col gap-1 my-1">
+              <Link
+                href="/login"
+                onClick={closeDrawer}
+                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container/60 flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-lg text-on-surface-variant">login</span>
+                <span>Log In</span>
+              </Link>
+              <Link
+                href="/register"
+                onClick={closeDrawer}
+                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-secondary bg-secondary/10 hover:bg-secondary/20 flex items-center gap-2.5"
+              >
+                <span className="material-symbols-outlined text-lg text-secondary">person_add</span>
+                <span>Create Free Account</span>
+              </Link>
+            </div>
           )}
 
           {onPlanTrip ? (
