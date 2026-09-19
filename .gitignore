@@ -90,6 +90,7 @@ postgres_data/
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep
+!data/raw/pakistan_places.json
 !data/processed/.gitkeep
 ml/experiments/*/checkpoints/
 ml/experiments/*/cache/
