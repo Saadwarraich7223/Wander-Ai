@@ -43,6 +43,8 @@ app.add_middleware(
 
 @app.get("/", tags=["Root"])
 @app.get("/api", tags=["Root"])
+@app.get("/api/index", tags=["Root"], include_in_schema=False)
+@app.get("/api/index.py", tags=["Root"], include_in_schema=False)
 async def root_endpoint() -> dict[str, str]:
     """Root status endpoint."""
     return {
