@@ -116,9 +116,25 @@ class Settings(BaseSettings):
         if not v or not v.strip():
             return "sqlite+aiosqlite:///./dev.db"
         if v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql+asyncpg://", 1)
-        if v.startswith("postgresql://") and not v.startswith("postgresql+"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgresql://") and not v.startswith("postgresql+"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+        # Sanitize query parameters for asyncpg (replace sslmode with ssl)
+        try:
+            import urllib.parse
+            parsed = urllib.parse.urlsplit(v)
+            if "asyncpg" in parsed.scheme and parsed.query:
+                query_params = urllib.parse.parse_qs(parsed.query)
+                sslmode = query_params.pop("sslmode", None)
+                query_params.pop("channel_binding", None)
+                if sslmode or "neon.tech" in parsed.netloc or "supabase.co" in parsed.netloc:
+                    if "ssl" not in query_params:
+                        query_params["ssl"] = ["require"]
+                new_query = urllib.parse.urlencode(query_params, doseq=True)
+                v = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, new_query, parsed.fragment))
+        except Exception:
+            pass
         return v
 
     @field_validator("SYNC_DATABASE_URL", mode="before")
