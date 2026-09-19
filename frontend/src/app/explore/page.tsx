@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { placesApi, aiApi, interactionsApi, tripsApi, getErrorMessage } from "@/lib/api";
@@ -341,7 +341,7 @@ const DEFAULT_REGIONS: Record<string, RegionData> = {
   },
 };
 
-export default function SmartMapPage() {
+function SmartMapContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -1876,3 +1876,21 @@ export default function SmartMapPage() {
     </div>
   );
 }
+
+export default function SmartMapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center p-8">
+          <div className="flex items-center gap-3 text-secondary">
+            <span className="material-symbols-outlined text-3xl animate-spin">progress_activity</span>
+            <span className="font-display font-bold text-lg">Loading Geospatial Explorer...</span>
+          </div>
+        </div>
+      }
+    >
+      <SmartMapContent />
+    </Suspense>
+  );
+}
+
