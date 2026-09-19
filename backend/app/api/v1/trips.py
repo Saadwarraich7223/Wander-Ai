@@ -125,6 +125,7 @@ async def _load_trip_with_itinerary(
 
 
 @router.post("", response_model=TripResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=TripResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_trip(
     payload: TripCreateRequest,
     db: AsyncSession = Depends(get_db),
@@ -159,6 +160,7 @@ async def create_trip(
 
 
 @router.get("", response_model=list[TripResponse])
+@router.get("/", response_model=list[TripResponse], include_in_schema=False)
 async def list_user_trips(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

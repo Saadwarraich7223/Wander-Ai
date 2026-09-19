@@ -17,6 +17,7 @@ router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
 
 @router.get("", response_model=RecommendationFeedResponse)
+@router.get("/", response_model=RecommendationFeedResponse, include_in_schema=False)
 async def get_recommendations(
     model: str = Query(
         "model_b",

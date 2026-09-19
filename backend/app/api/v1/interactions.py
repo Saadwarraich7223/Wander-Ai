@@ -17,6 +17,7 @@ router = APIRouter(prefix="/interactions", tags=["Interactions"])
 
 
 @router.post("", response_model=InteractionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=InteractionResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def log_interaction(
     payload: InteractionCreateRequest,
     db: AsyncSession = Depends(get_db),
