@@ -40,6 +40,20 @@ app.add_middleware(
 )
 
 
+@app.get("/", tags=["Root"])
+@app.get("/api", tags=["Root"])
+async def root_endpoint() -> dict[str, str]:
+    """Root status endpoint."""
+    return {
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "online",
+        "docs_url": "/docs",
+        "health_url": "/health",
+        "api_v1_url": "/api/v1",
+    }
+
+
 @app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 async def health_check() -> dict[str, str]:
