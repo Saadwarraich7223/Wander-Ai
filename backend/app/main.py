@@ -41,23 +41,8 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def vercel_path_rewrite_middleware(request: Request, call_next):
-    """Ensure Vercel serverless functions properly route to matched path."""
-    matched_path = request.headers.get("x-matched-path") or request.headers.get("x-forwarded-uri")
-    if matched_path:
-        clean_path = matched_path.split("?")[0]
-        if clean_path and clean_path != request.scope.get("path"):
-            request.scope["path"] = clean_path
-            request.scope["raw_path"] = clean_path.encode("utf-8")
-
-    return await call_next(request)
-
-
 @app.get("/", tags=["Root"])
 @app.get("/api", tags=["Root"])
-@app.get("/api/index", tags=["Root"], include_in_schema=False)
-@app.get("/api/index.py", tags=["Root"], include_in_schema=False)
 async def root_endpoint() -> dict[str, str]:
     """Root status endpoint."""
     return {
