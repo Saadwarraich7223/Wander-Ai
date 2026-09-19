@@ -23,11 +23,11 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # ── Database ─────────────────────────────────────────────
-    DATABASE_URL: str
-    SYNC_DATABASE_URL: str | None = None
+    DATABASE_URL: str = "sqlite+aiosqlite:///./dev.db"
+    SYNC_DATABASE_URL: str | None = "sqlite:///./dev.db"
 
     # ── Auth / JWT ───────────────────────────────────────────
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = "wander_ai_default_secret_jwt_key_2026_secure_32_characters_minimum"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -69,6 +69,24 @@ class Settings(BaseSettings):
     # ── Itinerary defaults ───────────────────────────────────
     ITINERARY_DAY_START_HOUR: int = 9   # 09:00
     ITINERARY_DAY_END_HOUR: int = 21    # 21:00
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgresql://") and not v.startswith("postgresql+"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
+    @field_validator("SYNC_DATABASE_URL", mode="before")
+    @classmethod
+    def validate_sync_database_url(cls, v: str | None) -> str | None:
+        if v and v.startswith("postgresql+asyncpg://"):
+            return v.replace("postgresql+asyncpg://", "postgresql://", 1)
+        if v and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod
