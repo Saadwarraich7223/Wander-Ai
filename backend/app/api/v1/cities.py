@@ -16,6 +16,7 @@ router = APIRouter(prefix="/cities", tags=["Cities"])
 
 
 @router.get("", response_model=list[CityResponse])
+@router.get("/", response_model=list[CityResponse], include_in_schema=False)
 async def list_cities(
     db: AsyncSession = Depends(get_db),
 ) -> Any:

@@ -102,6 +102,7 @@ def _format_place_detail(place: Place) -> PlaceDetailResponse:
 
 
 @router.get("", response_model=PaginatedResponse[PlaceSummaryResponse])
+@router.get("/", response_model=PaginatedResponse[PlaceSummaryResponse], include_in_schema=False)
 async def list_places(
     params: PlaceSearchParams = Depends(),
     db: AsyncSession = Depends(get_db),

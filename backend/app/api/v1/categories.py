@@ -14,6 +14,7 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 
 
 @router.get("", response_model=list[CategoryResponse])
+@router.get("/", response_model=list[CategoryResponse], include_in_schema=False)
 async def list_categories(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
