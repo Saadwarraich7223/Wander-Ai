@@ -304,17 +304,30 @@ export default function Navbar({
           )}
 
           {isLoggedIn ? (
-            <Link
-              href="/profile"
-              onClick={closeDrawer}
-              className="py-2.5 px-3 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container/60 flex items-center justify-between"
-            >
-              <span className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-lg text-secondary">person</span>
-                <span>My Profile</span>
-              </span>
-              <span className="text-xs text-on-surface-variant">{currentUser?.full_name || "Account"}</span>
-            </Link>
+            <>
+              <Link
+                href="/profile"
+                onClick={closeDrawer}
+                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container/60 flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-lg text-secondary">person</span>
+                  <span>My Profile</span>
+                </span>
+                <span className="text-xs text-on-surface-variant">{currentUser?.full_name || "Account"}</span>
+              </Link>
+              <Link
+                href="/admin"
+                onClick={closeDrawer}
+                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-lg text-emerald-600">admin_panel_settings</span>
+                  <span>Admin Studio</span>
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 font-bold">PANEL</span>
+              </Link>
+            </>
           ) : (
             <div className="flex flex-col gap-1 my-1">
               <Link
