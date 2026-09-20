@@ -6,6 +6,7 @@ import { placesApi, recApi, aiApi, interactionsApi, getErrorMessage } from "@/li
 import { authStorage } from "@/lib/auth";
 import { PlaceSummary, Category, City, RAGSource, User } from "@/types";
 import Navbar from "@/components/Navbar";
+import StructuredData from "@/components/StructuredData";
 
 interface VibeItem {
   id: string;
@@ -24,28 +25,56 @@ const ALL_VIBES: VibeItem[] = [
   { id: "wildlife", name: "Wildlife", emoji: "🌿" },
 ];
 
-import StructuredData from "@/components/StructuredData";
+interface FaqItem {
+  id: string;
+  category: "all" | "ai" | "destinations" | "logistics";
+  q: string;
+  a: string;
+  badge: string;
+}
 
-const FAQS = [
+const FAQS: FaqItem[] = [
   {
-    q: "How does WanderAI generate personalized Pakistan itineraries?",
-    a: "WanderAI synthesizes verified topographic routes, seasonal weather windows, local budget controls, and bespoke traveler preferences to craft optimal day-by-day itineraries across Pakistan in seconds.",
+    id: "faq-1",
+    category: "ai",
+    q: "How does WanderAI generate personalized Pakistan itineraries in seconds?",
+    a: "WanderAI combines high-resolution topographic GIS data, seasonal weather windows, local budget controls, and bespoke traveler preferences (pace, travel style, party size). Our algorithmic engine synthesizes optimized day-by-day schedules with realistic travel times across mountain passes and national highways.",
+    badge: "Algorithmic Engine",
   },
   {
-    q: "Which destinations and valleys across Pakistan are covered?",
-    a: "WanderAI indexes all major tourist corridors including Gilgit-Baltistan (Hunza, Skardu, Deosai, Fairy Meadows, Khunjerab), Khyber Pakhtunkhwa (Swat, Kalam, Kumrat, Naran-Kaghan), Azad Kashmir (Neelum Valley, Ratti Gali), Punjab (Lahore Walled City, Islamabad), and coastal Balochistan & Sindh.",
+    id: "faq-2",
+    category: "destinations",
+    q: "Which destinations and mountain valleys across Pakistan are covered?",
+    a: "WanderAI indexes all major tourist corridors including Gilgit-Baltistan (Hunza, Skardu, Deosai, Fairy Meadows, Khunjerab Pass), Khyber Pakhtunkhwa (Swat, Kalam, Kumrat, Naran-Kaghan), Azad Kashmir (Neelum Valley, Ratti Gali), Punjab (Lahore Walled City, Islamabad, Salt Range), and coastal Balochistan & Sindh.",
+    badge: "National Catalog",
   },
   {
-    q: "Is WanderAI free to use for planning travel?",
-    a: "Yes! You can explore all curated destinations, view seasonal weather windows, check budget estimates, and generate custom multi-day travel plans completely free.",
+    id: "faq-3",
+    category: "logistics",
+    q: "How accurate are the estimated travel budgets in Pakistani Rupees (PKR)?",
+    a: "Our cost intelligence benchmarks verified ground rates across Pakistan, factoring in 4x4 mountain jeep rentals, fuel consumption across high-altitude routes, accommodation tiers (from budget guesthouses to luxury boutique resorts), and regional dining costs.",
+    badge: "Cost Intelligence",
   },
   {
-    q: "How accurate are the estimated travel budgets?",
-    a: "Our cost engine calculates verified local expenses across Pakistan including fuel, 4x4 jeep rentals, accommodation ranges, and regional dining to ensure accurate budgeting for backpacking, family trips, or luxury tours.",
+    id: "faq-4",
+    category: "ai",
+    q: "Can I customize, swap waypoints, or re-optimize my itinerary?",
+    a: "Yes! Every generated expedition is completely customizable. You can drag and reorder waypoints, add custom stops, adjust daily transit hours, and click 'Re-Synthesize' to recalculate optimal routes instantly.",
+    badge: "Interactive Co-Pilot",
   },
   {
-    q: "Can I customize or re-optimize my itinerary after generation?",
-    a: "Yes. You can add or remove waypoints, change your trip pace, adjust daily stops, and instantly re-synthesize your expedition using our AI Co-Pilot.",
+    id: "faq-5",
+    category: "destinations",
+    q: "How does WanderAI account for road closures and seasonal weather windows?",
+    a: "Our system cross-references elevation data with historical seasonality matrices (such as Babusar Pass opening windows, Deosai snowmelt schedules, and Khunjerab winter border closures) to ensure your route is safe, open, and realistic.",
+    badge: "Elevation Matrix",
+  },
+  {
+    id: "faq-6",
+    category: "logistics",
+    q: "Is WanderAI completely free for travelers?",
+    a: "Yes! Exploring curated destinations, checking seasonal weather windows, comparing local budget estimates, and synthesizing custom multi-day travel itineraries are completely free.",
+    badge: "Zero Cost",
   },
 ];
 
@@ -268,6 +297,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<PlaceSummary[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [selectedFaqCategory, setSelectedFaqCategory] = useState<"all" | "ai" | "destinations" | "logistics">("all");
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   // Dynamic Data States
@@ -458,6 +488,10 @@ export default function HomePage() {
   });
 
   const activeWaypoint = MAP_WAYPOINTS[activeMapId] || MAP_WAYPOINTS["lahore"];
+
+  const filteredFaqs = FAQS.filter(
+    (item) => selectedFaqCategory === "all" || item.category === selectedFaqCategory
+  );
 
   const faqJsonLd = {
     "@context": "https://schema.org",
@@ -1359,49 +1393,149 @@ export default function HomePage() {
             </section>
           </div>
 
-          {/* ==================== FAQ ACCORDION SECTION ==================== */}
-          <section className="mt-16 sm:mt-24 pt-8 border-t border-outline-variant/60" aria-label="Frequently Asked Questions">
-            <div className="max-w-3xl mx-auto flex flex-col gap-8">
-              <div className="text-center flex flex-col gap-2">
-                <div className="inline-flex items-center justify-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-secondary">
-                  <span className="material-symbols-outlined text-base">quiz</span>
-                  Travel Intelligence FAQ
+          {/* ==================== 7. COMPREHENSIVE EXPEDITION FAQ SECTION ==================== */}
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 w-full border-t border-outline-variant/60" id="faq" aria-label="Frequently Asked Questions">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+              
+              {/* Left Column: Heading, Category Tabs & AI Concierge Card */}
+              <div className="lg:col-span-5 flex flex-col gap-6 lg:sticky lg:top-24">
+                <div className="flex flex-col gap-3">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-xs font-mono font-bold tracking-wider uppercase w-fit">
+                    <span className="material-symbols-outlined text-sm">quiz</span>
+                    Expedition Intelligence FAQ
+                  </div>
+                  <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-on-surface tracking-tight leading-[1.15]">
+                    Clear Answers for <span className="text-secondary">Smarter Expeditions</span>
+                  </h2>
+                  <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed">
+                    Everything you need to know about our algorithmic route synthesis, local budget models, elevation windows, and Pakistan destination coverage.
+                  </p>
                 </div>
-                <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-on-surface tracking-tight">
-                  Frequently Asked Questions
-                </h2>
-                <p className="text-sm sm:text-base text-on-surface-variant max-w-xl mx-auto leading-relaxed">
-                  Everything you need to know about planning intelligent, verified expeditions across Pakistan with WanderAI.
-                </p>
+
+                {/* Category Filter Tabs */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {[
+                    { id: "all", label: "All Questions", icon: "dataset" },
+                    { id: "ai", label: "AI & Planning", icon: "auto_awesome" },
+                    { id: "destinations", label: "Valleys & Passes", icon: "landscape" },
+                    { id: "logistics", label: "Costs & Logistics", icon: "payments" },
+                  ].map((tab) => {
+                    const isActive = selectedFaqCategory === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setSelectedFaqCategory(tab.id as any);
+                          setOpenFaqIndex(0);
+                        }}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-secondary text-white shadow-sm shadow-secondary/20 font-bold"
+                            : "bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container border border-outline-variant/60"
+                        }`}
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-sm">{tab.icon}</span>
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* AI Concierge Callout Box */}
+                <div className="p-5 sm:p-6 rounded-3xl bg-surface-container-low/90 border border-outline-variant/70 shadow-subtle flex flex-col gap-4 relative overflow-hidden backdrop-blur-md mt-2">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-2xl pointer-events-none" />
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-secondary text-white flex items-center justify-center shadow-sm shrink-0">
+                      <span className="material-symbols-outlined text-xl">smart_toy</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-on-surface">Have a bespoke expedition question?</span>
+                      <span className="text-[11px] text-on-surface-variant">Our AI Concierge has real-time topographic answers</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    Ask about specific mountain passes, fuel estimates between Islamabad and Skardu, or family-friendly hotels in Hunza.
+                  </p>
+
+                  <div className="flex items-center gap-2.5 pt-1">
+                    <Link
+                      href="/assistant"
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold transition-all shadow-sm hover:shadow-glow flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                    >
+                      <span>Chat with Concierge</span>
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </Link>
+                    <Link
+                      href="/planner"
+                      className="py-2.5 px-4 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant font-display text-xs font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <span>AI Planner</span>
+                    </Link>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-3">
-                {FAQS.map((faq, idx) => {
+              {/* Right Column: High-End Accordion Cards */}
+              <div className="lg:col-span-7 flex flex-col gap-3.5 sm:gap-4">
+                {filteredFaqs.map((faq, idx) => {
                   const isOpen = openFaqIndex === idx;
+                  const numberStr = (idx + 1).toString().padStart(2, "0");
+
                   return (
                     <div
-                      key={idx}
-                      className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest overflow-hidden transition-all shadow-2xs"
+                      key={faq.id}
+                      className={`rounded-2xl sm:rounded-3xl border transition-all duration-300 overflow-hidden bg-surface-container-lowest ${
+                        isOpen
+                          ? "border-secondary/40 shadow-elevated ring-1 ring-secondary/20"
+                          : "border-outline-variant/60 shadow-subtle hover:shadow-md hover:border-outline-variant"
+                      }`}
                     >
                       <button
                         onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                        className="w-full px-5 sm:px-6 py-4 sm:py-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:bg-surface-container-low/50 transition-colors"
+                        className="w-full p-4 sm:p-6 text-left flex items-start justify-between gap-4 cursor-pointer transition-colors group"
                         type="button"
                         aria-expanded={isOpen}
                       >
-                        <h3 className="font-display text-sm sm:text-base font-bold text-on-surface">
-                          {faq.q}
-                        </h3>
-                        <span
-                          className={`material-symbols-outlined text-on-surface-variant transition-transform duration-300 shrink-0 ${
-                            isOpen ? "rotate-180 text-secondary" : ""
+                        <div className="flex items-start gap-3.5 sm:gap-4 flex-1">
+                          <span
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center text-xs font-mono font-bold shrink-0 transition-colors duration-300 mt-0.5 ${
+                              isOpen
+                                ? "bg-secondary text-white shadow-xs"
+                                : "bg-surface-container text-on-surface-variant group-hover:bg-secondary/15 group-hover:text-secondary"
+                            }`}
+                          >
+                            {numberStr}
+                          </span>
+                          <div className="flex flex-col gap-1 flex-1">
+                            {faq.badge && (
+                              <span className="text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-wider text-secondary">
+                                {faq.badge}
+                              </span>
+                            )}
+                            <h3 className="font-display text-sm sm:text-base lg:text-lg font-bold text-on-surface leading-snug group-hover:text-secondary transition-colors">
+                              {faq.q}
+                            </h3>
+                          </div>
+                        </div>
+
+                        <div
+                          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 ${
+                            isOpen
+                              ? "bg-secondary text-white rotate-180 shadow-xs"
+                              : "bg-surface-container text-on-surface-variant group-hover:bg-secondary/10 group-hover:text-secondary"
                           }`}
                         >
-                          expand_more
-                        </span>
+                          <span className="material-symbols-outlined text-lg sm:text-xl">
+                            keyboard_arrow_down
+                          </span>
+                        </div>
                       </button>
+
                       {isOpen && (
-                        <div className="px-5 sm:px-6 pb-5 pt-1 text-xs sm:text-sm text-on-surface-variant leading-relaxed border-t border-outline-variant/30">
+                        <div className="px-4 sm:px-6 pb-5 sm:pb-6 pt-1 sm:pt-2 border-t border-outline-variant/30 text-xs sm:text-sm text-on-surface-variant leading-relaxed pl-14 sm:pl-18 animate-fade-in">
                           <p>{faq.a}</p>
                         </div>
                       )}
