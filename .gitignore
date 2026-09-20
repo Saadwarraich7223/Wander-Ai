@@ -110,6 +110,8 @@ desktop.ini
 .omo/
 .codegraph/
 implementation_plan*
+ADMIN_PANEL_CONTEXT_AND_ROADMAP.md
+ADMIN_STUDIO_*.md
 *.tsbuildinfo
 
 # ============================================================
