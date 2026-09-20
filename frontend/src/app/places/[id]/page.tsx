@@ -307,8 +307,8 @@ export default function PlaceDetailPage() {
           <div className="lg:col-span-2 relative rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated min-h-[380px] sm:min-h-[440px] bg-surface-container">
             {place?.primary_image?.url || city?.image_url ? (
               <img
-                src={place.primary_image?.url || city?.image_url}
-                alt={place.name}
+                src={place?.primary_image?.url || city?.image_url}
+                alt={place?.name || "Destination landscape"}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             ) : (

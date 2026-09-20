@@ -72,7 +72,7 @@ async function fetchPlaceData(id: string) {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const resolvedParams = await params;
   const place = await fetchPlaceData(resolvedParams.id);
@@ -120,7 +120,7 @@ export default async function PlaceDetailLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
   const place = await fetchPlaceData(resolvedParams.id);
