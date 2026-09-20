@@ -361,12 +361,24 @@ export default function UserProfilePage() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center mb-4">
-          <span className="material-symbols-outlined text-2xl animate-spin">progress_activity</span>
-        </div>
-        <h2 className="font-display font-bold text-lg text-on-surface mb-1">Verifying Traveler Session</h2>
-        <p className="text-xs text-on-surface-variant">Accessing your WanderAI travel passport...</p>
+      <div className="min-h-screen bg-background font-sans text-on-surface antialiased flex flex-col">
+        <Navbar user={user} />
+        <main className="w-full bg-background flex-1 pt-24 pb-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 animate-pulse">
+            <div className="h-48 rounded-3xl bg-surface-container-lowest border border-outline-variant/60 p-8 flex items-center gap-6">
+              <div className="w-20 h-20 rounded-full bg-surface-container" />
+              <div className="space-y-3 flex-1">
+                <div className="w-48 h-6 rounded-lg bg-surface-container" />
+                <div className="w-32 h-4 rounded bg-surface-container" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="h-64 rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6" />
+              <div className="h-64 rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6" />
+              <div className="h-64 rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6" />
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

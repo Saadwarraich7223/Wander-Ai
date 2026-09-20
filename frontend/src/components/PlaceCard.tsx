@@ -373,6 +373,37 @@ function FeaturedCard({ place, regionName, cityName, imageClassName }: { place: 
   );
 }
 
+export function PlaceCardSkeleton({ className, imageClassName }: { className?: string; imageClassName?: string }) {
+  return (
+    <article className={`rounded-2xl bg-surface-container-lowest border border-outline-variant/60 shadow-subtle overflow-hidden flex flex-col justify-between h-full ${className ?? ""}`}>
+      <div className={`relative overflow-hidden bg-surface-container/70 animate-pulse ${imageClassName ?? "aspect-[16/10]"}`}>
+        <div className="absolute top-3 left-3 w-16 h-5 rounded-md bg-surface-container-high/80" />
+        <div className="absolute bottom-2 left-3 w-24 h-4 rounded bg-surface-container-high/80" />
+        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-surface-container-high/80" />
+      </div>
+
+      <div className="p-5 flex flex-col flex-1 justify-between gap-4">
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="w-3/5 h-5 rounded-lg bg-surface-container animate-pulse" />
+            <div className="w-1/4 h-4 rounded bg-surface-container animate-pulse" />
+          </div>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="w-20 h-5 rounded bg-surface-container animate-pulse" />
+            <div className="w-16 h-5 rounded bg-surface-container animate-pulse" />
+            <div className="w-14 h-5 rounded bg-surface-container animate-pulse" />
+            <div className="w-16 h-5 rounded bg-surface-container animate-pulse" />
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-3 border-t border-outline-variant/40">
+          <div className="w-16 h-4 rounded bg-surface-container animate-pulse" />
+          <div className="w-24 h-7 rounded-xl bg-surface-container animate-pulse" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function PlaceCard({
   place,
   regionName,

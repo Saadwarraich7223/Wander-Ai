@@ -169,11 +169,70 @@ export default function TripDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background text-on-surface flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-secondary/20 border-t-secondary rounded-full animate-spin" />
-          <p className="text-body-md text-on-surface-variant font-medium">Loading itinerary details...</p>
-        </div>
+      <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
+        <Navbar />
+
+        <main className="w-full pt-24 bg-background">
+          <div className="relative w-full max-w-[1440px] mx-auto px-unit-8 pb-unit-20 space-y-8">
+            {/* Breadcrumb skeleton */}
+            <div className="flex items-center justify-between pt-unit-8 pb-unit-4">
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-4 rounded bg-surface-container animate-pulse" />
+                <div className="w-3 h-3 rounded bg-surface-container animate-pulse" />
+                <div className="w-32 h-4 rounded bg-surface-container animate-pulse" />
+              </div>
+              <div className="w-24 h-6 rounded-full bg-surface-container animate-pulse" />
+            </div>
+
+            {/* Itinerary Command Header Skeleton */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-outline-variant/60">
+              <div className="space-y-3">
+                <div className="w-64 sm:w-96 h-10 rounded-xl bg-surface-container animate-pulse" />
+                <div className="flex flex-wrap gap-2">
+                  <div className="w-20 h-6 rounded-full bg-surface-container animate-pulse" />
+                  <div className="w-28 h-6 rounded-full bg-surface-container animate-pulse" />
+                  <div className="w-32 h-6 rounded-full bg-surface-container animate-pulse" />
+                  <div className="w-24 h-6 rounded-full bg-surface-container animate-pulse" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-32 h-10 rounded-xl bg-surface-container animate-pulse" />
+                <div className="w-32 h-10 rounded-xl bg-surface-container animate-pulse" />
+              </div>
+            </div>
+
+            {/* Itinerary Timeline Days Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                {[1, 2, 3].map((day) => (
+                  <div key={day} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6 space-y-4 shadow-xs animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <div className="w-32 h-6 rounded-lg bg-surface-container" />
+                      <div className="w-24 h-4 rounded bg-surface-container" />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="w-full h-16 rounded-xl bg-surface-container-low" />
+                      <div className="w-full h-16 rounded-xl bg-surface-container-low" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Sidebar Summary Skeleton */}
+              <div className="space-y-6">
+                <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6 space-y-5 shadow-xs animate-pulse">
+                  <div className="w-36 h-5 rounded bg-surface-container" />
+                  <div className="space-y-3">
+                    <div className="w-full h-4 rounded bg-surface-container" />
+                    <div className="w-5/6 h-4 rounded bg-surface-container" />
+                    <div className="w-4/6 h-4 rounded bg-surface-container" />
+                  </div>
+                  <div className="w-full h-36 rounded-xl bg-surface-container-low" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

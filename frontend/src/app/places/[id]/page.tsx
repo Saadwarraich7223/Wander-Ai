@@ -217,21 +217,7 @@ export default function PlaceDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-          <div className="h-14 rounded-2xl bg-surface-container animate-pulse" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 aspect-[16/9] rounded-2xl bg-surface-container animate-pulse" />
-            <div className="rounded-2xl bg-surface-container animate-pulse h-96" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!place || loadError) {
+  if (!loading && (!place || loadError)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <span className="material-symbols-outlined text-5xl text-outline mb-4">
@@ -270,23 +256,25 @@ export default function PlaceDetailPage() {
             <span className="material-symbols-outlined text-sm text-outline">
               chevron_right
             </span>
-            <span className="text-on-surface font-semibold">{place.name}</span>
+            <span className="text-on-surface font-semibold">
+              {place ? place.name : <span className="inline-block w-28 h-3.5 rounded bg-surface-container animate-pulse align-middle" />}
+            </span>
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            {place.is_unesco_heritage && (
+            {place?.is_unesco_heritage && (
               <div className="flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-xs font-bold text-amber-700 dark:text-amber-300">
                 <span className="material-symbols-outlined text-sm text-amber-500">workspace_premium</span>
                 UNESCO World Heritage Site
               </div>
             )}
-            {place.elevation_meters && (
+            {place?.elevation_meters && (
               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-outline-variant/50 text-xs font-semibold text-on-surface-variant">
                 <span className="material-symbols-outlined text-sm text-secondary">landscape</span>
                 {place.elevation_meters.toLocaleString()}m Altitude
               </div>
             )}
-            {place.vehicle_access && (
+            {place?.vehicle_access && (
               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-outline-variant/50 text-xs font-semibold text-on-surface-variant">
                 <span className="material-symbols-outlined text-sm text-secondary">
                   {place.vehicle_access === "4x4_jeep" ? "directions_car" : place.vehicle_access === "trekking_only" ? "hiking" : "directions_car"}
@@ -298,7 +286,7 @@ export default function PlaceDetailPage() {
               <span className="material-symbols-outlined text-sm text-secondary">
                 my_location
               </span>
-              {place.latitude.toFixed(4)}°N, {place.longitude.toFixed(4)}°E
+              {place ? `${place.latitude.toFixed(4)}°N, ${place.longitude.toFixed(4)}°E` : "35.4222°N, 75.4497°E"}
             </div>
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-outline-variant/50 text-xs font-semibold text-on-surface-variant">
               <span className="material-symbols-outlined text-sm text-secondary">route</span>
@@ -316,15 +304,15 @@ export default function PlaceDetailPage() {
         </div>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-          <div className="lg:col-span-2 relative rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated min-h-[380px] sm:min-h-[440px]">
-            {place.primary_image?.url || city?.image_url ? (
+          <div className="lg:col-span-2 relative rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated min-h-[380px] sm:min-h-[440px] bg-surface-container">
+            {place?.primary_image?.url || city?.image_url ? (
               <img
                 src={place.primary_image?.url || city?.image_url}
                 alt={place.name}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             ) : (
-              <div className="absolute inset-0 w-full h-full bg-surface-container-high flex items-center justify-center">
+              <div className="absolute inset-0 w-full h-full bg-surface-container-high/80 animate-pulse flex items-center justify-center">
                 <span className="material-symbols-outlined text-6xl text-outline">
                   landscape
                 </span>
@@ -335,12 +323,12 @@ export default function PlaceDetailPage() {
             <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 <span className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white text-xs font-bold">
-                  {place.category.name}
+                  {place?.category?.name ?? "Heritage & Scenic"}
                 </span>
                 <span className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white text-xs capitalize">
-                  {place.indoor_outdoor}
+                  {place?.indoor_outdoor ?? "Outdoor"}
                 </span>
-                {place.family_suitable && (
+                {place?.family_suitable && (
                   <span className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white text-xs">
                     Family Friendly
                   </span>
@@ -392,20 +380,25 @@ export default function PlaceDetailPage() {
               </p>
               <div className="flex flex-wrap items-baseline gap-3">
                 <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                  {place.name}
+                  {place ? place.name : <span className="inline-block w-64 h-8 rounded-lg bg-white/20 animate-pulse align-middle" />}
                 </h1>
-                {place.name_ur && (
+                {place?.name_ur && (
                   <span className="text-xl sm:text-2xl text-emerald-300 font-semibold font-serif dir-rtl">
                     {place.name_ur}
                   </span>
                 )}
               </div>
-              {place.description && (
+              {place?.description ? (
                 <p className="mt-3 max-w-xl text-sm text-white/85 leading-relaxed">
                   {place.description.slice(0, 220)}
                   {place.description.length > 220 ? "…" : ""}
                 </p>
-              )}
+              ) : loading ? (
+                <div className="mt-3 space-y-1.5 max-w-xl">
+                  <div className="w-full h-3.5 rounded bg-white/20 animate-pulse" />
+                  <div className="w-4/5 h-3.5 rounded bg-white/20 animate-pulse" />
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -490,7 +483,7 @@ export default function PlaceDetailPage() {
                 Customize & Generate Route
               </button>
               <button
-                onClick={() => openAddStop(place.id)}
+                onClick={() => place && openAddStop(place.id)}
                 className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl border border-secondary text-secondary hover:bg-secondary-light font-display text-xs sm:text-sm font-semibold transition-all cursor-pointer"
                 type="button"
               >
@@ -536,7 +529,7 @@ export default function PlaceDetailPage() {
               <SeasonCard key={s.name} {...s} />
             ))}
           </div>
-          {typeof place.seasonality?.note === "string" && (
+          {typeof place?.seasonality?.note === "string" && (
             <p className="text-xs text-on-surface-variant">{place.seasonality.note}</p>
           )}
         </section>
@@ -551,7 +544,18 @@ export default function PlaceDetailPage() {
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {siblings.map((sibling, idx) => (
+            {loading ? (
+              [1, 2, 3].map((i) => (
+                <div key={i} className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden shadow-sm animate-pulse flex flex-col h-72">
+                  <div className="h-40 bg-surface-container" />
+                  <div className="p-5 space-y-3 flex-1">
+                    <div className="w-3/4 h-4 rounded bg-surface-container" />
+                    <div className="w-full h-3 rounded bg-surface-container" />
+                    <div className="w-1/2 h-3 rounded bg-surface-container" />
+                  </div>
+                </div>
+              ))
+            ) : siblings.map((sibling, idx) => (
               <article
                 key={sibling.id}
                 className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl overflow-hidden shadow-sm hover:shadow-elevated transition-all flex flex-col"
@@ -665,13 +669,13 @@ export default function PlaceDetailPage() {
                 <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
                   <span className="text-on-surface-variant">Food relevance</span>
                   <span className="text-secondary">
-                    {Math.round((place.food_relevance ?? 0.5) * 100)}%
+                    {Math.round((place?.food_relevance ?? 0.5) * 100)}%
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-surface-container overflow-hidden">
                   <div
                     className="h-full rounded-full bg-secondary transition-all"
-                    style={{ width: `${Math.round((place.food_relevance ?? 0.5) * 100)}%` }}
+                    style={{ width: `${Math.round((place?.food_relevance ?? 0.5) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -695,14 +699,14 @@ export default function PlaceDetailPage() {
                 <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
                   <span className="text-on-surface-variant">Historical depth</span>
                   <span className="text-secondary">
-                    {Math.round((place.historical_significance ?? 0.5) * 100)}%
+                    {Math.round((place?.historical_significance ?? 0.5) * 100)}%
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-surface-container overflow-hidden">
                   <div
                     className="h-full rounded-full bg-secondary transition-all"
                     style={{
-                      width: `${Math.round((place.historical_significance ?? 0.5) * 100)}%`,
+                      width: `${Math.round((place?.historical_significance ?? 0.5) * 100)}%`,
                     }}
                   />
                 </div>

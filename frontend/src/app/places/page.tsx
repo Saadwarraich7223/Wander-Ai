@@ -5,7 +5,7 @@ import Link from "next/link";
 import { placesApi, tripsApi } from "@/lib/api";
 import { Category, City, PlaceSummary, Trip } from "@/types";
 import Navbar from "@/components/Navbar";
-import PlaceCard from "@/components/PlaceCard";
+import PlaceCard, { PlaceCardSkeleton } from "@/components/PlaceCard";
 
 const PAGE_SIZE = 6;
 
@@ -351,25 +351,6 @@ export default function PlacesPage() {
   const selectClass =
   "w-full appearance-none bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs sm:text-sm py-2.5 pl-2.5 sm:pl-3 pr-7 sm:pr-8 rounded-xl border border-transparent outline-none cursor-pointer transition-colors truncate";
 
-  if (loading) {
-    return (
-      <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col">
-        <Navbar />
-        <main className="w-full bg-background flex-grow pt-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 space-y-8">
-            <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
-            <div className="h-48 rounded-3xl bg-surface-container animate-pulse" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-96 rounded-2xl bg-surface-container animate-pulse" />
-              ))}
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col">
       <Navbar tripsCount={trips.length} />
@@ -402,10 +383,17 @@ export default function PlacesPage() {
                     PostGIS Engine v3.4 Active
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/50 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                    {cities.length} Regional Corridors
+                    {cities.length > 0 ? `${cities.length} Regional Corridors` : "7 Major Corridors"}
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/50 text-[11px] font-bold uppercase tracking-wider text-secondary">
-                    {places.length} Verified Destinations
+                    {loading ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping" />
+                        Fetching Destinations...
+                      </span>
+                    ) : (
+                      `${places.length} Verified Destinations`
+                    )}
                   </span>
                   <Link
                     href="/explore#map"
@@ -536,7 +524,7 @@ export default function PlacesPage() {
                       }`}
                     type="button"
                   >
-                    All Destinations ({places.length})
+                    All Destinations {places.length > 0 ? `(${places.length})` : loading ? "" : "(0)"}
                   </button>
                   {categories.map((cat) => (
                     <button
@@ -551,7 +539,7 @@ export default function PlacesPage() {
                       {cat.icon && (
                         <span className="material-symbols-outlined text-[15px]">{materialIcon(cat.icon)}</span>
                       )}
-                      {cat.name} ({categoryCount(cat.id)})
+                      {cat.name} {places.length > 0 ? `(${categoryCount(cat.id)})` : ""}
                     </button>
                   ))}
                 </div>
@@ -564,8 +552,8 @@ export default function PlacesPage() {
                       Verified Regional Catalog
                     </h2>
                     <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
-                      Showing <strong className="text-on-surface">{pageItems.length}</strong> of{" "}
-                      <strong className="text-on-surface">{filtered.length}</strong> destinations
+                      Showing <strong className="text-on-surface">{loading ? 6 : pageItems.length}</strong> of{" "}
+                      <strong className="text-on-surface">{loading ? "140+" : filtered.length}</strong> destinations
                     </p>
                   </div>
                   <div className="flex items-center gap-2.5 flex-wrap">
@@ -595,7 +583,13 @@ export default function PlacesPage() {
                   </div>
                 </div>
 
-                {pageItems.length === 0 ? (
+                {loading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <PlaceCardSkeleton key={`catalog-skeleton-${i}`} />
+                    ))}
+                  </div>
+                ) : pageItems.length === 0 ? (
                   <div className="py-16 flex flex-col items-center justify-center text-center gap-3">
                     <span className="material-symbols-outlined text-5xl text-outline">search_off</span>
                     <h3 className="font-display text-xl font-extrabold text-on-surface">No destinations match those filters</h3>
@@ -747,48 +741,58 @@ export default function PlacesPage() {
                     </Link>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-5 sm:h-[420px]">
-                    {featured[0] && (
-                      <div className="relative sm:row-span-2 h-[340px] sm:h-full">
-                        <span className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant/60 shadow-subtle flex items-center justify-center font-display text-xs font-bold text-secondary">
-                          01
-                        </span>
-                        <PlaceCard
-                          place={featured[0]}
-                          variant="cover"
-                          prominent
-                          regionName={cityById.get(featured[0].city_id)?.region?.name}
-                          className="h-full"
-                        />
+                  {loading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-5 sm:h-[420px]">
+                      <div className="relative sm:row-span-2 h-[340px] sm:h-full rounded-2xl bg-surface-container/70 border border-outline-variant/50 animate-pulse overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                       </div>
-                    )}
-                    {featured[1] && (
-                      <div className="relative h-[200px] sm:h-full">
-                        <span className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant/60 shadow-subtle flex items-center justify-center font-display text-xs font-bold text-secondary">
-                          02
-                        </span>
-                        <PlaceCard
-                          place={featured[1]}
-                          variant="cover"
-                          regionName={cityById.get(featured[1].city_id)?.region?.name}
-                          className="h-full"
-                        />
-                      </div>
-                    )}
-                    {featured[2] && (
-                      <div className="relative h-[200px] sm:h-full">
-                        <span className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant/60 shadow-subtle flex items-center justify-center font-display text-xs font-bold text-secondary">
-                          03
-                        </span>
-                        <PlaceCard
-                          place={featured[2]}
-                          variant="cover"
-                          regionName={cityById.get(featured[2].city_id)?.region?.name}
-                          className="h-full"
-                        />
-                      </div>
-                    )}
-                  </div>
+                      <div className="relative h-[200px] sm:h-full rounded-2xl bg-surface-container/70 border border-outline-variant/50 animate-pulse overflow-hidden" />
+                      <div className="relative h-[200px] sm:h-full rounded-2xl bg-surface-container/70 border border-outline-variant/50 animate-pulse overflow-hidden" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-5 sm:h-[420px]">
+                      {featured[0] && (
+                        <div className="relative sm:row-span-2 h-[340px] sm:h-full">
+                          <span className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant/60 shadow-subtle flex items-center justify-center font-display text-xs font-bold text-secondary">
+                            01
+                          </span>
+                          <PlaceCard
+                            place={featured[0]}
+                            variant="cover"
+                            prominent
+                            regionName={cityById.get(featured[0].city_id)?.region?.name}
+                            className="h-full"
+                          />
+                        </div>
+                      )}
+                      {featured[1] && (
+                        <div className="relative h-[200px] sm:h-full">
+                          <span className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant/60 shadow-subtle flex items-center justify-center font-display text-xs font-bold text-secondary">
+                            02
+                          </span>
+                          <PlaceCard
+                            place={featured[1]}
+                            variant="cover"
+                            regionName={cityById.get(featured[1].city_id)?.region?.name}
+                            className="h-full"
+                          />
+                        </div>
+                      )}
+                      {featured[2] && (
+                        <div className="relative h-[200px] sm:h-full">
+                          <span className="absolute -top-2 -left-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest border border-outline-variant/60 shadow-subtle flex items-center justify-center font-display text-xs font-bold text-secondary">
+                            03
+                          </span>
+                          <PlaceCard
+                            place={featured[2]}
+                            variant="cover"
+                            regionName={cityById.get(featured[2].city_id)?.region?.name}
+                            className="h-full"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <Link
                     href="/explore#map"

@@ -232,10 +232,36 @@ export default function TripsPage() {
 
           {/* LOADING STATE */}
           {loading ? (
-            <div className="max-w-7xl mx-auto px-4 py-20 flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-4 border-secondary/20 border-t-secondary rounded-full animate-spin" />
-              <p className="text-sm text-on-surface-variant">Fetching live expedition vector matrices...</p>
-            </div>
+            <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col justify-between rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-5 shadow-xs animate-pulse space-y-5"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="w-20 h-5 rounded bg-surface-container" />
+                        <div className="w-24 h-4 rounded bg-surface-container" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="w-3/4 h-5 rounded-lg bg-surface-container" />
+                        <div className="w-full h-3 rounded bg-surface-container" />
+                        <div className="w-5/6 h-3 rounded bg-surface-container" />
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-surface-container-low/70 space-y-2">
+                        <div className="w-24 h-3 rounded bg-surface-container" />
+                        <div className="w-3/4 h-4 rounded bg-surface-container" />
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-outline-variant/40 flex items-center justify-between">
+                      <div className="w-20 h-5 rounded bg-surface-container" />
+                      <div className="w-24 h-8 rounded-xl bg-surface-container" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           ) : error ? (
             <div className="max-w-md mx-auto my-12 p-4 rounded-xl bg-error/10 border border-error/20 text-error text-xs text-center">
               {error}
