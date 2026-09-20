@@ -24,6 +24,31 @@ const ALL_VIBES: VibeItem[] = [
   { id: "wildlife", name: "Wildlife", emoji: "🌿" },
 ];
 
+import StructuredData from "@/components/StructuredData";
+
+const FAQS = [
+  {
+    q: "How does WanderAI generate personalized Pakistan itineraries?",
+    a: "WanderAI synthesizes verified topographic routes, seasonal weather windows, local budget controls, and bespoke traveler preferences to craft optimal day-by-day itineraries across Pakistan in seconds.",
+  },
+  {
+    q: "Which destinations and valleys across Pakistan are covered?",
+    a: "WanderAI indexes all major tourist corridors including Gilgit-Baltistan (Hunza, Skardu, Deosai, Fairy Meadows, Khunjerab), Khyber Pakhtunkhwa (Swat, Kalam, Kumrat, Naran-Kaghan), Azad Kashmir (Neelum Valley, Ratti Gali), Punjab (Lahore Walled City, Islamabad), and coastal Balochistan & Sindh.",
+  },
+  {
+    q: "Is WanderAI free to use for planning travel?",
+    a: "Yes! You can explore all curated destinations, view seasonal weather windows, check budget estimates, and generate custom multi-day travel plans completely free.",
+  },
+  {
+    q: "How accurate are the estimated travel budgets?",
+    a: "Our cost engine calculates verified local expenses across Pakistan including fuel, 4x4 jeep rentals, accommodation ranges, and regional dining to ensure accurate budgeting for backpacking, family trips, or luxury tours.",
+  },
+  {
+    q: "Can I customize or re-optimize my itinerary after generation?",
+    a: "Yes. You can add or remove waypoints, change your trip pace, adjust daily stops, and instantly re-synthesize your expedition using our AI Co-Pilot.",
+  },
+];
+
 // Fallback initial places in case backend DB is seeding or offline
 const INITIAL_PLACES: PlaceSummary[] = [
   {
@@ -243,6 +268,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<PlaceSummary[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   // Dynamic Data States
   const [places, setPlaces] = useState<PlaceSummary[]>(INITIAL_PLACES);
@@ -433,8 +459,22 @@ export default function HomePage() {
 
   const activeWaypoint = MAP_WAYPOINTS[activeMapId] || MAP_WAYPOINTS["lahore"];
 
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQS.map((faq) => ({
+      "@type": "Question",
+      name: faq.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.a,
+      },
+    })),
+  };
+
   return (
     <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col">
+      <StructuredData data={faqJsonLd} />
       {/* ==================== 1. FIXED HEADER / NAVIGATION ==================== */}
       <Navbar onSearch={() => setSearchOpen(true)} user={user} />
 
@@ -1318,6 +1358,59 @@ export default function HomePage() {
               </div>
             </section>
           </div>
+
+          {/* ==================== FAQ ACCORDION SECTION ==================== */}
+          <section className="mt-16 sm:mt-24 pt-8 border-t border-outline-variant/60" aria-label="Frequently Asked Questions">
+            <div className="max-w-3xl mx-auto flex flex-col gap-8">
+              <div className="text-center flex flex-col gap-2">
+                <div className="inline-flex items-center justify-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-secondary">
+                  <span className="material-symbols-outlined text-base">quiz</span>
+                  Travel Intelligence FAQ
+                </div>
+                <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-on-surface tracking-tight">
+                  Frequently Asked Questions
+                </h2>
+                <p className="text-sm sm:text-base text-on-surface-variant max-w-xl mx-auto leading-relaxed">
+                  Everything you need to know about planning intelligent, verified expeditions across Pakistan with WanderAI.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {FAQS.map((faq, idx) => {
+                  const isOpen = openFaqIndex === idx;
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest overflow-hidden transition-all shadow-2xs"
+                    >
+                      <button
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="w-full px-5 sm:px-6 py-4 sm:py-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:bg-surface-container-low/50 transition-colors"
+                        type="button"
+                        aria-expanded={isOpen}
+                      >
+                        <h3 className="font-display text-sm sm:text-base font-bold text-on-surface">
+                          {faq.q}
+                        </h3>
+                        <span
+                          className={`material-symbols-outlined text-on-surface-variant transition-transform duration-300 shrink-0 ${
+                            isOpen ? "rotate-180 text-secondary" : ""
+                          }`}
+                        >
+                          expand_more
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="px-5 sm:px-6 pb-5 pt-1 text-xs sm:text-sm text-on-surface-variant leading-relaxed border-t border-outline-variant/30">
+                          <p>{faq.a}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
         </div>
       </main>
 
@@ -1326,66 +1419,91 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-outline-variant/60">
             {/* Brand Column */}
-            <div className="lg:col-span-4 flex flex-col items-start gap-4">
-              <div className="flex items-center gap-3">
-                <span className="font-display text-xl font-bold text-on-surface tracking-tight">
-                  WanderAI
-                </span>
-              </div>
+            <div className="lg:col-span-3 flex flex-col items-start gap-4">
+              <Link href="/" className="font-display text-xl font-bold text-on-surface tracking-tight hover:text-secondary transition-colors">
+                WanderAI
+              </Link>
               <p className="text-sm font-semibold text-on-surface">
                 Explore more. Plan smarter. Travel better.
               </p>
               <p className="text-xs text-on-surface-variant max-w-sm leading-relaxed">
-                High-touch bespoke travel curation augmented by state-of-the-art computational intelligence.
+                High-touch bespoke travel curation augmented by state-of-the-art computational intelligence for Pakistan &amp; beyond.
               </p>
             </div>
 
-            {/* Column 1: Explore */}
+            {/* Column 1: Explore Directory */}
             <div className="lg:col-span-2 flex flex-col gap-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
-                Explore
+              <span className="text-xs font-bold uppercase tracking-wider text-on-surface font-mono">
+                Destinations
               </span>
               <div className="flex flex-col gap-2 text-xs sm:text-sm">
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#destinations">
-                  Curated Itineraries
-                </a>
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#destinations">
-                  Regional Guides
-                </a>
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#smart-map">
-                  Interactive Waypoints
-                </a>
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#destinations">
-                  Bespoke Expeditions
-                </a>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places">
+                  All Destinations
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?category=nature">
+                  Valleys &amp; Peaks
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?category=culture">
+                  Cultural Heritage
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?category=adventure">
+                  Adventure Trails
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/explore">
+                  Interactive Map
+                </Link>
               </div>
             </div>
 
-            {/* Column 2: AI Tools */}
+            {/* Column 2: Top Pakistan Regions */}
             <div className="lg:col-span-2 flex flex-col gap-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
-                AI Tools
+              <span className="text-xs font-bold uppercase tracking-wider text-on-surface font-mono">
+                Top Regions
               </span>
               <div className="flex flex-col gap-2 text-xs sm:text-sm">
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#hero-ai-input">
-                  Smart Synthesizer
-                </a>
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#hero-ai-input">
-                  Concierge Companion
-                </a>
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#smart-map">
-                  Elevation &amp; Climate
-                </a>
-                <a className="text-on-surface-variant hover:text-secondary transition-colors" href="#features">
-                  Dynamic Waypoints
-                </a>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?search=Hunza">
+                  Hunza Valley
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?search=Skardu">
+                  Skardu &amp; Deosai
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?search=Lahore">
+                  Lahore Walled City
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?search=Swat">
+                  Swat &amp; Kalam
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/places?search=Neelum">
+                  Neelum Valley
+                </Link>
               </div>
             </div>
 
-            {/* Column 3: Newsletter */}
-            <div className="lg:col-span-4 flex flex-col gap-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
-                AI Dispatch &amp; Updates
+            {/* Column 3: AI Intelligence Tools */}
+            <div className="lg:col-span-2 flex flex-col gap-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-on-surface font-mono">
+                AI Engines
+              </span>
+              <div className="flex flex-col gap-2 text-xs sm:text-sm">
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/planner">
+                  Expedition Synthesizer
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/assistant">
+                  AI Travel Concierge
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/recommendations">
+                  Vibe Matcher
+                </Link>
+                <Link className="text-on-surface-variant hover:text-secondary transition-colors" href="/trips">
+                  Saved Itineraries
+                </Link>
+              </div>
+            </div>
+
+            {/* Column 4: Newsletter */}
+            <div className="lg:col-span-3 flex flex-col gap-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-on-surface font-mono">
+                Expedition Dispatch
               </span>
               <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                 Receive exclusive seasonal expedition releases and algorithmic travel insights.
@@ -1414,17 +1532,17 @@ export default function HomePage() {
 
           {/* Bottom Legal Bar */}
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
-            <p>© 2025 WanderAI Intelligence Inc. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} WanderAI Intelligence Inc. All rights reserved.</p>
             <div className="flex items-center gap-6">
-              <a className="hover:text-on-surface transition-colors" href="#">
-                Privacy Policy
-              </a>
-              <a className="hover:text-on-surface transition-colors" href="#">
-                Terms of Service
-              </a>
-              <a className="hover:text-on-surface transition-colors" href="#">
-                Security Architecture
-              </a>
+              <Link className="hover:text-on-surface transition-colors" href="/places">
+                Destinations Directory
+              </Link>
+              <Link className="hover:text-on-surface transition-colors" href="/explore">
+                Topographic Map
+              </Link>
+              <Link className="hover:text-on-surface transition-colors" href="/planner">
+                Trip Generator
+              </Link>
             </div>
           </div>
         </div>

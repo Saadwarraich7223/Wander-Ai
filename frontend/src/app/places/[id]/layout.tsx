@@ -1,0 +1,190 @@
+import type { Metadata } from "next";
+import StructuredData from "@/components/StructuredData";
+
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://wanderai.travel").replace(/\/+$/, "");
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
+
+const FALLBACK_PLACES: Record<string, any> = {
+  "hunza-express": {
+    name: "Hunza Valley & Karimabad",
+    city: "Gilgit",
+    description:
+      "Explore the majestic Karakoram peaks, ancient Altit & Baltit forts, and serene apricot orchards of Hunza Valley in Gilgit-Baltistan.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAky2BntZW4gkilTOyaiD7E5EPAGPseUMIn8FQk5P-rlcUcyojZR5yj3i8j3uRTzkCVi3A2gRsux4uRF8PhB1MxYnGRMVcBmMzOAz6k7n5MsYfs8Vr_0CRi_ZnkptQ_gIRC1vA1OLLZyT5Qdxu9IhduBm1WSqIxE6bfMPBWXUD1xlvScKhQnvAFSXNiY1AiaVKBED75Bh8MR9Jexe-CSdM9EYARPKP-usB2K4Pg_1w9XmRTfbuIuw1a8w",
+    latitude: 36.3167,
+    longitude: 74.8833,
+  },
+  "skardu-deosai": {
+    name: "Skardu & Deosai National Park",
+    city: "Skardu",
+    description:
+      "Gateway to K2, the Land of Giants (Deosai Plains), Shangrila Lower Kachura Lake, and high-altitude desert dunes.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuB8oU4AY82kHH1ALHhXPtqQ-fRcr0VC4DPRUaV7_rBsoAv780fjGuIfOwvwRT-RL_mpjmsrWRXNJ5Uz75jHpnMpy4kpxZm4J_59F4AAscOeV0pUQaW2znpFW5gLcV2fBKH5qhyslfTME9i6O8XfTE1NGGe8fbq-j8x6JZCeDxNoBMjFFkog6XnXdN6XGj0A3KJ--_YcoaSKLpiuArSb1tt3nKHO28BX9rTxw8a6WtoNjdvrqdirDQxNlw",
+    latitude: 35.2989,
+    longitude: 75.6337,
+  },
+  "lahore-walled-city": {
+    name: "Lahore Walled City & Badshahi",
+    city: "Lahore",
+    description:
+      "Centuries of Mughal architecture, Shahi Hammam, Delhi Gate, and world-renowned street food on Fort Road.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBP1qU8Z8g2yYO4vLQCCobey_pLadT_F2rwGqYr54EcD93hWeJvXwJDyAjCJ-FH7ZsoBYhyib8LEWQsp4I3cnKWKwOix1Zsf8aMTFd99O0xTTY2d13KtAOwyKMfX5L_qjVzvOSEa91EorToae0ajkhkFlzlntye9IUUBKVj8wQgQoJFaEeLu021DRs3SWJVKuFYfqS4uOMEwrnsvs2S3wlPGonrPwk4pNiNQ8qAYgyQAGw_7N0U1qCTXw",
+    latitude: 31.5882,
+    longitude: 74.3094,
+  },
+  "swat-kalam": {
+    name: "Swat Valley & Kalam Alpine Waters",
+    city: "Swat",
+    description:
+      "Known as the Switzerland of the East, featuring lush pine forests, Ushu Forest, Mahodand Lake, and Buddhist archaeological heritage.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAky2BntZW4gkilTOyaiD7E5EPAGPseUMIn8FQk5P-rlcUcyojZR5yj3i8j3uRTzkCVi3A2gRsux4uRF8PhB1MxYnGRMVcBmMzOAz6k7n5MsYfs8Vr_0CRi_ZnkptQ_gIRC1vA1OLLZyT5Qdxu9IhduBm1WSqIxE6bfMPBWXUD1xlvScKhQnvAFSXNiY1AiaVKBED75Bh8MR9Jexe-CSdM9EYARPKP-usB2K4Pg_1w9XmRTfbuIuw1a8w",
+    latitude: 35.4947,
+    longitude: 72.5857,
+  },
+};
+
+async function fetchPlaceData(id: string) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/places/${id}`, {
+      next: { revalidate: 3600 },
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // Graceful fallback to static dictionary or placeholder
+  }
+  return FALLBACK_PLACES[id] || {
+    name: id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    city: "Pakistan",
+    description: `Complete travel guide, route planning, weather windows, and itinerary optimization for ${id.replace(/-/g, " ")}.`,
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAky2BntZW4gkilTOyaiD7E5EPAGPseUMIn8FQk5P-rlcUcyojZR5yj3i8j3uRTzkCVi3A2gRsux4uRF8PhB1MxYnGRMVcBmMzOAz6k7n5MsYfs8Vr_0CRi_ZnkptQ_gIRC1vA1OLLZyT5Qdxu9IhduBm1WSqIxE6bfMPBWXUD1xlvScKhQnvAFSXNiY1AiaVKBED75Bh8MR9Jexe-CSdM9EYARPKP-usB2K4Pg_1w9XmRTfbuIuw1a8w",
+    latitude: 33.6844,
+    longitude: 73.0479,
+  };
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }> | { id: string };
+}): Promise<Metadata> {
+  const resolvedParams = await params;
+  const place = await fetchPlaceData(resolvedParams.id);
+  const placeName = place.name || "Destination";
+  const cityName = place.city?.name || place.city || "Pakistan";
+  const desc =
+    place.description?.slice(0, 160) ||
+    `Complete travel guide, estimated costs, seasonality, and itinerary synthesis for ${placeName} in ${cityName}, Pakistan.`;
+  const imgUrl =
+    place.primary_image?.url ||
+    place.image ||
+    "https://lh3.googleusercontent.com/aida-public/AB6AXuAky2BntZW4gkilTOyaiD7E5EPAGPseUMIn8FQk5P-rlcUcyojZR5yj3i8j3uRTzkCVi3A2gRsux4uRF8PhB1MxYnGRMVcBmMzOAz6k7n5MsYfs8Vr_0CRi_ZnkptQ_gIRC1vA1OLLZyT5Qdxu9IhduBm1WSqIxE6bfMPBWXUD1xlvScKhQnvAFSXNiY1AiaVKBED75Bh8MR9Jexe-CSdM9EYARPKP-usB2K4Pg_1w9XmRTfbuIuw1a8w";
+
+  return {
+    title: `${placeName} — Travel Guide, Route Planning & Itinerary`,
+    description: desc,
+    alternates: {
+      canonical: `/places/${resolvedParams.id}`,
+    },
+    openGraph: {
+      title: `${placeName}, ${cityName} | WanderAI Pakistan Guide`,
+      description: desc,
+      url: `${SITE_URL}/places/${resolvedParams.id}`,
+      type: "article",
+      images: [
+        {
+          url: imgUrl,
+          width: 1200,
+          height: 630,
+          alt: `${placeName} in ${cityName}, Pakistan`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${placeName}, ${cityName} Travel Guide | WanderAI`,
+      description: desc,
+      images: [imgUrl],
+    },
+  };
+}
+
+export default async function PlaceDetailLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ id: string }> | { id: string };
+}) {
+  const resolvedParams = await params;
+  const place = await fetchPlaceData(resolvedParams.id);
+  const placeName = place.name || "Destination";
+  const cityName = place.city?.name || place.city || "Pakistan";
+  const imgUrl =
+    place.primary_image?.url ||
+    place.image ||
+    "https://lh3.googleusercontent.com/aida-public/AB6AXuAky2BntZW4gkilTOyaiD7E5EPAGPseUMIn8FQk5P-rlcUcyojZR5yj3i8j3uRTzkCVi3A2gRsux4uRF8PhB1MxYnGRMVcBmMzOAz6k7n5MsYfs8Vr_0CRi_ZnkptQ_gIRC1vA1OLLZyT5Qdxu9IhduBm1WSqIxE6bfMPBWXUD1xlvScKhQnvAFSXNiY1AiaVKBED75Bh8MR9Jexe-CSdM9EYARPKP-usB2K4Pg_1w9XmRTfbuIuw1a8w";
+
+  const placeJsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "TouristDestination",
+      name: placeName,
+      description: place.description || `Travel and tourism guide for ${placeName}.`,
+      image: imgUrl,
+      url: `${SITE_URL}/places/${resolvedParams.id}`,
+      containedInPlace: {
+        "@type": "AdministrativeArea",
+        name: cityName,
+        containedInPlace: {
+          "@type": "Country",
+          name: "Pakistan",
+        },
+      },
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: place.latitude || 33.6844,
+        longitude: place.longitude || 73.0479,
+      },
+      publicAccess: true,
+      touristType: ["Nature", "Cultural", "Adventure", "Heritage"],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: SITE_URL,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Destinations",
+          item: `${SITE_URL}/places`,
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: placeName,
+          item: `${SITE_URL}/places/${resolvedParams.id}`,
+        },
+      ],
+    },
+  ];
+
+  return (
+    <>
+      <StructuredData data={placeJsonLd} />
+      {children}
+    </>
+  );
+}

@@ -36,12 +36,14 @@ export function matchPercent(place: PlaceSummary): number {
   return Math.min(99, Math.round((place.popularity_score || 0) * 100));
 }
 
-function PlaceVisual({ place, className }: { place: PlaceSummary; className: string }) {
+function PlaceVisual({ place, cityName, className }: { place: PlaceSummary; cityName?: string; className: string }) {
+  const altText = `${place.name}${cityName ? ` in ${cityName}, Pakistan` : " travel destination in Pakistan"}`;
   if (place.primary_image?.url) {
     return (
       <img
         src={place.primary_image.url}
-        alt={place.name}
+        alt={altText}
+        loading="lazy"
         className={`w-full h-full object-cover ${className}`}
       />
     );
@@ -91,7 +93,7 @@ function CompactCard({
     <article className="group rounded-2xl bg-surface-container-lowest border border-outline-variant/60 shadow-subtle hover:shadow-elevated transition-all overflow-hidden flex flex-col justify-between h-full">
       <div className={`relative overflow-hidden bg-surface-container ${imageClassName ?? "aspect-[16/10]"}`}>
         <Link href={detailHref} className="absolute inset-0" aria-label={place.name}>
-          <PlaceVisual place={place} className="group-hover:scale-105 transition-transform duration-500" />
+          <PlaceVisual place={place} cityName={cityName} className="group-hover:scale-105 transition-transform duration-500" />
         </Link>
         {place.is_unesco_heritage && (
           <span className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-md bg-amber-500 text-slate-950 font-extrabold text-[10px] uppercase shadow-sm flex items-center gap-1">
@@ -290,7 +292,7 @@ function FeaturedCard({ place, regionName, cityName, imageClassName }: { place: 
     <article className="rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated bg-surface-container-lowest flex flex-col group transition-all duration-300 h-full">
       <div className={`relative overflow-hidden bg-surface-container ${imageClassName ?? "aspect-[16/9] sm:aspect-[21/10]"}`}>
         <Link href={detailHref} className="absolute inset-0" aria-label={place.name}>
-          <PlaceVisual place={place} className="group-hover:scale-105 transition-transform duration-700" />
+          <PlaceVisual place={place} cityName={cityName} className="group-hover:scale-105 transition-transform duration-700" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
           <div className="absolute top-4 left-4 flex flex-wrap gap-2">
             <span className="px-2.5 py-1 rounded-md bg-secondary text-white text-[11px] font-bold shadow-sm font-mono">
