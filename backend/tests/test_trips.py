@@ -9,23 +9,6 @@ from app.models.place import City, Region
 
 async def _get_auth_headers_and_city(async_client: AsyncClient) -> tuple[dict[str, str], str]:
     """Helper to register, login, and return headers + city_id."""
-    await async_client.post(
-        "/api/v1/auth/register",
-        json={
-            "name": "Trip Planner",
-            "email": f"planner_{uuid.uuid4().hex[:6]}@example.com",
-            "password": "TestPassword123!",
-        },
-    )
-    login_res = await async_client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": f"planner_{uuid.uuid4().hex[:6]}@example.com",
-            "password": "TestPassword123!",
-        },
-    )
-
-    # Register & login new clean user
     user_email = f"user_{uuid.uuid4().hex[:6]}@example.com"
     await async_client.post(
         "/api/v1/auth/register",
@@ -44,6 +27,7 @@ async def _get_auth_headers_and_city(async_client: AsyncClient) -> tuple[dict[st
     )
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
+
 
     # Ensure a city exists in test DB session
     async with TestingSessionLocal() as db:
@@ -124,3 +108,71 @@ async def test_reoptimize_trip_versioning(async_client: AsyncClient) -> None:
     assert data["active_itinerary"]["version"] == 2
     assert data["total_budget"] == 40000
     assert data["pace"] == "packed"
+
+
+@pytest.mark.asyncio
+async def test_add_and_remove_stop(async_client: AsyncClient) -> None:
+    """Test adding a stop and removing a stop from an active trip itinerary."""
+    headers, city_id = await _get_auth_headers_and_city(async_client)
+
+    # 1. Create a trip
+    create_res = await async_client.post(
+        "/api/v1/trips",
+        headers=headers,
+        json={
+            "city_id": city_id,
+            "title": "Stop Management Expedition",
+            "duration_days": 2,
+            "total_budget": 30000,
+            "pace": "moderate",
+        },
+    )
+    assert create_res.status_code == 201
+    trip_id = create_res.json()["id"]
+
+    # 2. Get a place to add
+    from app.models.place import Place, Category
+    async with TestingSessionLocal() as db:
+        cat = Category(name=f"Heritage-{uuid.uuid4().hex[:6]}", slug=f"heritage-{uuid.uuid4().hex[:6]}")
+        db.add(cat)
+        await db.flush()
+        place = Place(
+            city_id=uuid.UUID(city_id),
+            category_id=cat.id,
+            name=f"Royal Monument {uuid.uuid4().hex[:4]}",
+            slug=f"royal-monument-{uuid.uuid4().hex[:4]}",
+            latitude=31.55,
+            longitude=74.35,
+            estimated_cost_max=1500,
+            popularity_score=0.9,
+        )
+        db.add(place)
+        await db.commit()
+        place_id = str(place.id)
+
+    # 3. Add stop to Day 1
+    add_res = await async_client.post(
+        f"/api/v1/trips/{trip_id}/stops",
+        headers=headers,
+        json={
+            "place_id": place_id,
+            "preferred_day_number": 1,
+        },
+    )
+    assert add_res.status_code == 200
+    trip_data = add_res.json()
+    day1 = next(d for d in trip_data["active_itinerary"]["days"] if d["day_number"] == 1)
+    added_item = next(it for it in day1["items"] if it["place"]["id"] == place_id)
+    assert added_item is not None
+    item_id = added_item["id"]
+
+    # 4. Remove stop from Day 1
+    remove_res = await async_client.delete(
+        f"/api/v1/trips/{trip_id}/stops/{item_id}",
+        headers=headers,
+    )
+    assert remove_res.status_code == 200
+    rem_trip_data = remove_res.json()
+    day1_rem = next(d for d in rem_trip_data["active_itinerary"]["days"] if d["day_number"] == 1)
+    assert not any(it["id"] == item_id for it in day1_rem["items"])
+

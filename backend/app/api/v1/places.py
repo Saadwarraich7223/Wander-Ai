@@ -319,8 +319,9 @@ async def update_place(
     place_id: uuid.UUID,
     payload: PlaceUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
 ) -> Any:
-    """Update a place entity and its primary image URL."""
+    """Admin: update a place entity and its primary image URL."""
     stmt = (
         select(Place)
         .options(
@@ -382,6 +383,7 @@ async def update_place(
 async def delete_place(
     place_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin),
 ) -> None:
     """Admin: delete a place."""
     res = await db.execute(select(Place).filter(Place.id == place_id))
@@ -390,3 +392,4 @@ async def delete_place(
         raise HTTPException(status_code=404, detail="Place not found")
     await db.delete(place)
     await db.commit()
+

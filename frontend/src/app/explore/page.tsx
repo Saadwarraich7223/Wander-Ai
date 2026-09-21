@@ -559,35 +559,46 @@ function SmartMapContent() {
         });
       });
     } else {
-      // EXPLORE MODE: Merge default region POIs with backend places
-      pois.push(...region.pois);
-      backendPlaces.forEach((bp, idx) => {
-        if (!pois.some((p) => p.id === bp.id)) {
+      // EXPLORE MODE: If backendPlaces exist for the active city/search, prioritize them
+      if (backendPlaces.length > 0) {
+        backendPlaces.forEach((bp, idx) => {
+          const catSlug = bp.category?.slug?.toLowerCase() || "";
+          const catName = bp.category?.name || "Attraction";
+          let categoryKey: "heritage" | "dining" | "photopoint" = "heritage";
+          if (catSlug.includes("food") || catSlug.includes("din") || catSlug.includes("rest")) {
+            categoryKey = "dining";
+          } else if (catSlug.includes("photo") || catSlug.includes("nature") || catSlug.includes("scen")) {
+            categoryKey = "photopoint";
+          }
+
           pois.push({
             id: bp.id,
             name: bp.name,
-            category: bp.category?.slug?.includes("food") ? "dining" : bp.category?.slug?.includes("photo") ? "photopoint" : "heritage",
-            match: `${Math.min(99, 88 + (bp.popularity_score || 0.8) * 2)}% Match`,
-            tagline: bp.category?.name || "Popular Attraction",
+            category: categoryKey,
+            match: `${Math.min(99, Math.round(85 + (bp.popularity_score || 0.8) * 14))}% Apex Match`,
+            tagline: `${catName} · ${bp.indoor_outdoor === "outdoor" ? "Open Air" : "Curated Site"}`,
             hours: "Open Daily",
             price: bp.estimated_cost_min ? `PKR ${bp.estimated_cost_min.toLocaleString()}` : "Free Entry",
-            guide: bp.family_suitable ? "Family Friendly" : "Guided Tour",
-            rating: 4.8,
-            reviews: Math.round((bp.popularity_score || 0.8) * 150) + 120,
-            image: bp.primary_image?.url || region.pois[0]?.image || "",
+            guide: bp.family_suitable ? "Family Friendly" : "Guided Trail",
+            rating: Math.min(5.0, Number((4.3 + (bp.popularity_score || 0.8) * 0.7).toFixed(1))),
+            reviews: Math.round((bp.popularity_score || 0.8) * 450) + 80,
+            image: bp.primary_image?.url || region.pois[0]?.image || "https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=1000&auto=format&fit=crop",
             x: 50,
             y: 50,
-            waypointNum: region.pois.length + idx + 1,
-            desc: `Verified spatial node in ${region.name}. High popularity score (${bp.popularity_score}/10).`,
+            waypointNum: idx + 1,
+            desc: bp.description || `Audited destination node in ${region.name} with verified PostGIS spatial coordinate.`,
             lat: bp.latitude,
             lng: bp.longitude,
           });
-        }
-      });
+        });
+      } else {
+        pois.push(...region.pois);
+      }
     }
 
     return pois;
   }, [activeTripData, selectedRegionId, backendPlaces, backendCities]);
+
 
   const filteredPois = useMemo(
     () =>

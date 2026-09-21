@@ -32,16 +32,16 @@ class RecommendationService:
 
     async def get_recommendations(
         self,
-        user: User,
+        user: User | None = None,
         model_name: str = "model_b",
         context: dict[str, Any] | None = None,
         limit: int = 10,
     ) -> list[RecommendationResult]:
         """
-        Generate Top-K recommendations for a user.
+        Generate Top-K recommendations for an authenticated user or guest explorer.
 
         Args:
-            user: Authenticated User object
+            user: Authenticated User object or None for guest
             model_name: "model_a" | "model_b" | "model_c" | "model_d" | "model_e"
             context: Context dictionary (weather, month, destination)
             limit: Number of items to return
@@ -56,11 +56,32 @@ class RecommendationService:
         )
         all_places = list(places_res.scalars().all())
 
-        # Fetch user preferences
-        pref_res = await self.db.execute(
-            select(UserPreference).filter(UserPreference.user_id == user.id)
-        )
-        user_preferences = list(pref_res.scalars().all())
+        user_preferences: list[UserPreference] = []
+        user_interactions: list[UserInteraction] = []
+
+        if user and getattr(user, "id", None):
+            # Fetch user preferences
+            pref_res = await self.db.execute(
+                select(UserPreference).filter(UserPreference.user_id == user.id)
+            )
+            user_preferences = list(pref_res.scalars().all())
+
+            # User interactions
+            inter_res = await self.db.execute(
+                select(UserInteraction)
+                .filter(UserInteraction.user_id == user.id)
+                .order_by(UserInteraction.created_at.desc())
+                .limit(100)
+            )
+            user_interactions = list(inter_res.scalars().all())
+        else:
+            import uuid as _uuid
+            user = User(
+                id=_uuid.uuid4(),
+                email="guest@wanderai.internal",
+                name="Guest Explorer",
+                is_active=True,
+            )
 
         # Model A
         if model_name == "model_a":
@@ -70,15 +91,6 @@ class RecommendationService:
                 user_preferences=user_preferences,
                 limit=limit,
             )
-
-        # User interactions & tags
-        inter_res = await self.db.execute(
-            select(UserInteraction)
-            .filter(UserInteraction.user_id == user.id)
-            .order_by(UserInteraction.created_at.desc())
-            .limit(100)
-        )
-        user_interactions = list(inter_res.scalars().all())
 
         tag_res = await self.db.execute(select(Tag))
         all_tags = list(tag_res.scalars().all())
@@ -94,6 +106,7 @@ class RecommendationService:
         )
         if model_name == "model_b":
             return b_results
+
 
         # All interactions across all users for Collaborative Filtering
         all_inter_res = await self.db.execute(select(UserInteraction).limit(1000))

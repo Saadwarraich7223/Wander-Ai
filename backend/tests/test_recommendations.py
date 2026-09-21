@@ -68,3 +68,12 @@ async def test_get_recommendations_model_e(async_client: AsyncClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["model_used"] == "model_e"
+
+
+@pytest.mark.asyncio
+async def test_get_recommendations_guest(async_client: AsyncClient) -> None:
+    response = await async_client.get("/api/v1/recommendations?model=model_a")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["model_used"] == "model_a"
+

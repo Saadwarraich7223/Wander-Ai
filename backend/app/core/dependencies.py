@@ -56,6 +56,31 @@ async def get_current_user(
     return user
 
 
+async def get_optional_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User | None:
+    """
+    Extract user from Bearer token if present and valid; returns None for unauthenticated guests.
+    """
+    if credentials is None:
+        return None
+
+    try:
+        user_id_str = verify_access_token(credentials.credentials)
+        user_uuid = uuid.UUID(user_id_str)
+    except (JWTError, ValueError):
+        return None
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        return None
+
+    return user
+
+
 async def get_current_admin(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
@@ -70,5 +95,7 @@ async def get_current_admin(
 
 # Typed aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
+OptionalUser = Annotated[User | None, Depends(get_optional_current_user)]
 CurrentAdmin = Annotated[User, Depends(get_current_admin)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+

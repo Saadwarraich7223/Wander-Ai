@@ -82,6 +82,10 @@ export const tripsApi = {
     const res = await api.post(`/trips/${tripId}/stops`, data);
     return res.data;
   },
+  removeStop: async (tripId: string, itemId: string) => {
+    const res = await api.delete(`/trips/${tripId}/stops/${itemId}`);
+    return res.data;
+  },
 };
 
 export const placesApi = {

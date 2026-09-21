@@ -1,11 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { tripsApi, aiApi, getErrorMessage } from "@/lib/api";
-import { Trip, ItineraryDay, ItineraryItem } from "@/types";
+import { tripsApi, aiApi, placesApi, getErrorMessage } from "@/lib/api";
+import { Trip, ItineraryDay, ItineraryItem, PlaceSummary } from "@/types";
 import Navbar from "@/components/Navbar";
+import {
+  findPakistanLocation,
+  calculateRouteMetrics,
+  getDestinationClimate,
+  getDestinationInterests,
+  PAKISTAN_LOCATIONS,
+} from "@/lib/pakistanGeo";
+
+function calculateHaversineDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371.0;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180.0;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180.0;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180.0) *
+      Math.cos((lat2 * Math.PI) / 180.0) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 export default function TripDetailPage() {
   const params = useParams();
@@ -15,6 +41,16 @@ export default function TripDetailPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Stop removal & addition states
+  const [deletingStopId, setDeletingStopId] = useState<string | null>(null);
+  const [addingPlaceId, setAddingPlaceId] = useState<string | null>(null);
+  const [activeAddDay, setActiveAddDay] = useState<number | null>(null);
+  const [allPlaces, setAllPlaces] = useState<PlaceSummary[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placeSearchQuery, setPlaceSearchQuery] = useState("");
+  const [placeCategoryFilter, setPlaceCategoryFilter] = useState("all");
+  const [modalScopeFilter, setModalScopeFilter] = useState<"destination" | "all">("destination");
 
   // Expanded days state (Set of day numbers that are expanded)
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]));
@@ -34,20 +70,36 @@ export default function TripDetailPage() {
   // AI Concierge Chat State
   const [conciergeMessage, setConciergeMessage] = useState("");
   const [conciergeChat, setConciergeChat] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
-    { role: "assistant", text: "Salam! I'm your Karakoram AI Sentinel. Ask me about checkposts, fuel, altitude, or local customs along this route." },
+    { role: "assistant", text: "Salam! I'm your AI Route Sentinel. Ask me about checkposts, road conditions, fuel, or local cultural stops along this route." },
   ]);
   const [conciergeLoading, setConciergeLoading] = useState(false);
 
   // AI Drawer Chat State
   const [drawerMessage, setDrawerMessage] = useState("");
   const [drawerChat, setDrawerChat] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
-    { role: "assistant", text: "Algorithm ready. Type commands like: 'Make Day 3 more budget-friendly', 'Add more local food stops in Gulmit', or 'Shift duration to 6 days'." },
+    { role: "assistant", text: "Algorithm ready. Type commands like: 'Make Day 2 more budget-friendly', 'Add more local food stops', or 'Shift duration to 4 days'." },
   ]);
   const [drawerLoading, setDrawerLoading] = useState(false);
 
   useEffect(() => {
     if (tripId) fetchTrip();
   }, [tripId]);
+
+  useEffect(() => {
+    const fetchCandidatePlaces = async () => {
+      try {
+        setPlacesLoading(true);
+        const res = await placesApi.list({ limit: 250 });
+        const items = Array.isArray(res) ? res : res.items || [];
+        setAllPlaces(items);
+      } catch (e) {
+        console.error("Failed to load candidate places", e);
+      } finally {
+        setPlacesLoading(false);
+      }
+    };
+    fetchCandidatePlaces();
+  }, []);
 
   const fetchTrip = async () => {
     try {
@@ -89,6 +141,38 @@ export default function TripDetailPage() {
     }
   };
 
+  const handleRemoveStop = async (itemId: string, placeName: string, dayNumber?: number) => {
+    if (!window.confirm(`Remove "${placeName}" from this itinerary?`)) return;
+    try {
+      setDeletingStopId(itemId);
+      const updatedTrip = await tripsApi.removeStop(tripId, itemId);
+      setTrip(updatedTrip);
+      if (dayNumber !== undefined) {
+        setExpandedDays((prev) => new Set([...prev, dayNumber]));
+      }
+    } catch (err: any) {
+      alert("Failed to remove stop: " + getErrorMessage(err, "Could not delete stop"));
+    } finally {
+      setDeletingStopId(null);
+    }
+  };
+
+  const handleAddStop = async (placeId: string, dayNumber: number) => {
+    try {
+      setAddingPlaceId(placeId);
+      const updatedTrip = await tripsApi.addStop(tripId, {
+        place_id: placeId,
+        preferred_day_number: dayNumber,
+      });
+      setTrip(updatedTrip);
+      setExpandedDays((prev) => new Set([...prev, dayNumber]));
+    } catch (err: any) {
+      alert("Failed to add stop: " + getErrorMessage(err, "Could not add stop to itinerary"));
+    } finally {
+      setAddingPlaceId(null);
+    }
+  };
+
   const handleReoptimize = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -119,8 +203,8 @@ export default function TripDetailPage() {
     try {
       const res = await aiApi.chat({ message: userMsg, trip_id: tripId });
       setConciergeChat((prev) => [...prev, { role: "assistant", text: res.content || "Got it! Your itinerary has been updated with those preferences." }]);
-    } catch (err) {
-      setConciergeChat((prev) => [...prev, { role: "assistant", text: "The Karakoram Highway checkpost reports clear roads with mild mountain breeze. All permits for Hunza & Gojal are active." }]);
+    } catch {
+      setConciergeChat((prev) => [...prev, { role: "assistant", text: "The route corridor checkposts report clear roads with optimal travel conditions. All regional coordinates are verified." }]);
     } finally {
       setConciergeLoading(false);
     }
@@ -137,8 +221,8 @@ export default function TripDetailPage() {
     try {
       const res = await aiApi.chat({ message: userMsg, trip_id: tripId });
       setDrawerChat((prev) => [...prev, { role: "assistant", text: res.content || "I have analyzed your requested adjustment. Check your itinerary timeline for updated stops!" }]);
-    } catch (err) {
-      setDrawerChat((prev) => [...prev, { role: "assistant", text: "Understood! Serena Inn Karimabad and local tea houses offer burutz berikutz and fresh spinach puree. I've noted this in your preferences." }]);
+    } catch {
+      setDrawerChat((prev) => [...prev, { role: "assistant", text: "Understood! Your regional culinary stops and route pacing preferences have been calibrated." }]);
     } finally {
       setDrawerLoading(false);
     }
@@ -158,14 +242,222 @@ export default function TripDetailPage() {
     const cat = item.place.category?.name?.toLowerCase() || "";
     const name = item.place.name?.toLowerCase() || "";
 
-    if (cat.includes("hotel") || cat.includes("stay") || name.includes("hotel") || name.includes("serena") || name.includes("inn")) return "hotel";
-    if (cat.includes("heritage") || cat.includes("fort") || name.includes("fort") || name.includes("citadel")) return "fort";
-    if (cat.includes("food") || cat.includes("dining") || cat.includes("restaurant") || name.includes("cafe")) return "restaurant";
-    if (cat.includes("culture") || cat.includes("village") || name.includes("village")) return "holiday_village";
-    if (cat.includes("sunset") || name.includes("sunset") || name.includes("eagle")) return "wb_twilight";
-    if (cat.includes("nature") || name.includes("lake") || name.includes("pass")) return "landscape";
+    if (cat.includes("hotel") || cat.includes("stay") || name.includes("hotel") || name.includes("serena") || name.includes("inn") || name.includes("resort") || name.includes("camp")) return "hotel";
+    if (cat.includes("heritage") || cat.includes("fort") || name.includes("fort") || name.includes("palace") || name.includes("mahal") || name.includes("shrine") || name.includes("mosque")) return "fort";
+    if (cat.includes("food") || cat.includes("dining") || cat.includes("restaurant") || name.includes("cafe") || name.includes("bazaar") || name.includes("halwa")) return "restaurant";
+    if (cat.includes("culture") || cat.includes("village") || name.includes("museum") || name.includes("bazaar")) return "holiday_village";
+    if (cat.includes("sunset") || name.includes("sunset") || name.includes("vantage")) return "wb_twilight";
+    if (cat.includes("nature") || name.includes("lake") || name.includes("park") || name.includes("pass") || name.includes("safari") || name.includes("beach")) return "landscape";
     return "place";
   };
+
+  const originCityName =
+    (trip as any)?.preferences?.origin_city?.split("(")[0]?.trim() ||
+    (trip as any)?.context?.origin_city?.split("(")[0]?.trim() ||
+    "Islamabad";
+
+  // Derive target destination city name from preferences or trip title
+  const destinationCityName =
+    (trip as any)?.preferences?.destination?.split("(")[0]?.trim() ||
+    (trip as any)?.context?.destination?.split("(")[0]?.trim() ||
+    trip?.title
+      ?.replace(/\d+-Day/gi, "")
+      ?.replace(/Expedition|Tour|Trip|Getaway|Circuit/gi, "")
+      ?.replace(/from.*/gi, "")
+      ?.trim() ||
+    "Hunza Valley";
+
+  const defaultOrigin = PAKISTAN_LOCATIONS.find((l) => l.name === "Islamabad") || PAKISTAN_LOCATIONS[0];
+  const defaultDest = PAKISTAN_LOCATIONS.find((l) => l.name.includes("Hunza")) || PAKISTAN_LOCATIONS[0];
+
+  const originLoc = useMemo(
+    () => findPakistanLocation(originCityName) || defaultOrigin,
+    [originCityName, defaultOrigin]
+  );
+  const destLoc = useMemo(
+    () => findPakistanLocation(destinationCityName) || defaultDest,
+    [destinationCityName, defaultDest]
+  );
+
+  const routeMetrics = useMemo(
+    () => calculateRouteMetrics(originLoc, destLoc),
+    [originLoc, destLoc]
+  );
+
+  const climateMetrics = useMemo(
+    () => getDestinationClimate(destLoc, trip?.start_date),
+    [destLoc, trip?.start_date]
+  );
+
+  const destInterests = useMemo(() => getDestinationInterests(destLoc), [destLoc]);
+
+  // Mini forecast strip derived from destination climate
+  const miniForecast = useMemo(() => {
+    const high = climateMetrics.tempHighC;
+    const low = climateMetrics.tempLowC;
+    const elev = destLoc.elevation_m;
+    const isDesert =
+      destLoc.district.toLowerCase().includes("bahawalpur") ||
+      destLoc.district.toLowerCase().includes("bahawalnagar") ||
+      destLoc.name.toLowerCase().includes("cholistan");
+    const isCoastal = destLoc.province === "Sindh" || destLoc.name.toLowerCase().includes("gwadar");
+
+    return [
+      { day: "D1", icon: "sunny", high: high, low: low },
+      { day: "D2", icon: isDesert ? "sunny" : isCoastal ? "air" : "partly_cloudy_day", high: high - 1, low: low - 1 },
+      { day: "D3", icon: elev > 2000 ? "air" : "wb_sunny", high: high - 2, low: low - 2 },
+      { day: "D4", icon: elev > 2000 ? "ac_unit" : isDesert ? "wb_twilight" : "sunny", high: elev > 2000 ? high - 6 : high, low: elev > 2000 ? low - 5 : low },
+    ];
+  }, [climateMetrics, destLoc]);
+
+  // Tailored pack essentials based on terrain & elevation
+  const packingGear = useMemo(() => {
+    const elev = destLoc.elevation_m;
+    const isCold = elev > 1800;
+    const isDesert =
+      destLoc.district.toLowerCase().includes("bahawalpur") ||
+      destLoc.district.toLowerCase().includes("bahawalnagar") ||
+      destLoc.name.toLowerCase().includes("cholistan");
+    const isCoastal = destLoc.province === "Sindh" || destLoc.name.toLowerCase().includes("gwadar");
+
+    if (isCold) {
+      return [
+        { label: `Thermal mid-layer & fleece (${destLoc.name} heights)`, checked: true },
+        { label: "Wide-angle lens (16-35mm) + Circular Polarizer", checked: true },
+        { label: "High-altitude SPF 50+ & UV Lip Protectant", checked: true },
+        { label: "Ankle-support vibram sole trekking boots", checked: false },
+      ];
+    } else if (isDesert) {
+      return [
+        { label: "Breathable linen wear & sun-shield scarves", checked: true },
+        { label: "Astrophotography lens & sturdy tripod", checked: true },
+        { label: "High-SPF sunscreen & polarized sunglasses", checked: true },
+        { label: "Desert-terrain ankle shoes / sand gaiters", checked: false },
+      ];
+    } else if (isCoastal) {
+      return [
+        { label: "UV-protective swimwear & quick-dry microfiber towel", checked: true },
+        { label: "Waterproof camera casing / drone ND filters", checked: true },
+        { label: "Marine-safe SPF 50+ & hydration pack", checked: true },
+        { label: "Non-slip coastal footwear / water shoes", checked: false },
+      ];
+    } else {
+      return [
+        { label: "Comfortable city walking shoes & light daypack", checked: true },
+        { label: "Street & heritage photography camera setup", checked: true },
+        { label: "Light breathable jacket / evening layer", checked: true },
+        { label: "Power bank & local offline route maps", checked: false },
+      ];
+    }
+  }, [destLoc]);
+
+  // Track all place IDs, slugs, and names already in ANY day of the active itinerary
+  const scheduledPlaceIdentifiers = useMemo(() => {
+    const set = new Set<string>();
+    if (!trip?.active_itinerary?.days) return set;
+    for (const d of trip.active_itinerary.days) {
+      if (Array.isArray(d.items)) {
+        for (const it of d.items) {
+          if (it.place?.id) set.add(String(it.place.id).toLowerCase());
+          if ((it as any).place_id) set.add(String((it as any).place_id).toLowerCase());
+          if (it.place?.name) set.add(it.place.name.toLowerCase().trim());
+          if (it.place?.slug) set.add(it.place.slug.toLowerCase().trim());
+        }
+      }
+    }
+    return set;
+  }, [trip]);
+
+  // Unscheduled candidate places mapped with spatial distance from destLoc (excluding places already in ANY day)
+  const unscheduledPlacesWithDist = useMemo(() => {
+    return allPlaces
+      .filter((p) => {
+        const id = String(p.id).toLowerCase();
+        const name = (p.name || "").toLowerCase().trim();
+        const slug = (p.slug || "").toLowerCase().trim();
+        return !scheduledPlaceIdentifiers.has(id) && !scheduledPlaceIdentifiers.has(name) && !scheduledPlaceIdentifiers.has(slug);
+      })
+      .map((p) => {
+        const dist =
+          p.latitude && p.longitude && destLoc.latitude && destLoc.longitude
+            ? calculateHaversineDistanceKm(destLoc.latitude, destLoc.longitude, p.latitude, p.longitude)
+            : null;
+        return { place: p, distanceKm: dist };
+      });
+  }, [allPlaces, scheduledPlaceIdentifiers, destLoc]);
+
+  // Destination-specific candidate places strictly matching the destination city or within <= 150 km radius
+  const destinationCandidatePlaces = useMemo(() => {
+    const destName = destLoc.name.toLowerCase();
+    const destDistrict = (destLoc.district || "").toLowerCase().replace(" district", "").trim();
+    const destAliases = (destLoc.aliases || []).map((a) => a.toLowerCase().trim());
+
+    return unscheduledPlacesWithDist
+      .filter(({ place, distanceKm }) => {
+        // Priority 1: Exact city ID match
+        if (trip?.city_id && place.city_id === trip.city_id) return true;
+
+        // Priority 2: Geospatial proximity within realistic destination travel radius (<= 150 km)
+        if (distanceKm !== null && distanceKm <= 150) return true;
+
+        // Priority 3: Keyword match in place name/description
+        const pText = `${place.name} ${place.description || ""} ${(place as any).address || ""}`.toLowerCase();
+        if (pText.includes(destName)) return true;
+        if (destDistrict && pText.includes(destDistrict)) return true;
+        if (destAliases.some((a) => a.length >= 3 && pText.includes(a))) return true;
+
+        return false;
+      })
+      .sort((a, b) => {
+        // Closest distance first, then highest popularity
+        if (a.distanceKm !== null && b.distanceKm !== null) {
+          if (Math.abs(a.distanceKm - b.distanceKm) > 25) {
+            return a.distanceKm - b.distanceKm;
+          }
+        }
+        return (b.place.popularity_score || 0) - (a.place.popularity_score || 0);
+      });
+  }, [unscheduledPlacesWithDist, destLoc, trip?.city_id]);
+
+  // Top recommendations for open days / quick addition (strictly destination places, never unrelated out-of-region spots)
+  const topRecommendationsForDay = useMemo(() => {
+    return destinationCandidatePlaces.slice(0, 6);
+  }, [destinationCandidatePlaces]);
+
+  // Filtered candidate list for the Add Stop Modal
+  const modalCandidatePlaces = useMemo(() => {
+    const sourceList =
+      modalScopeFilter === "destination"
+        ? destinationCandidatePlaces
+        : [...unscheduledPlacesWithDist].sort((a, b) => {
+            if (a.distanceKm !== null && b.distanceKm !== null) {
+              return a.distanceKm - b.distanceKm;
+            }
+            return (b.place.popularity_score || 0) - (a.place.popularity_score || 0);
+          });
+
+    return sourceList.filter(({ place }) => {
+      // Category filter
+      if (placeCategoryFilter !== "all") {
+        const cat = (place.category?.name || place.category?.slug || "").toLowerCase();
+        if (placeCategoryFilter === "nature" && !cat.includes("nature") && !cat.includes("lake") && !cat.includes("park") && !cat.includes("pass") && !cat.includes("beach")) return false;
+        if (placeCategoryFilter === "heritage" && !cat.includes("heritage") && !cat.includes("fort") && !cat.includes("monument") && !cat.includes("history") && !cat.includes("palace") && !cat.includes("mosque")) return false;
+        if (placeCategoryFilter === "food" && !cat.includes("food") && !cat.includes("dining") && !cat.includes("restaurant") && !cat.includes("cafe")) return false;
+        if (placeCategoryFilter === "culture" && !cat.includes("culture") && !cat.includes("bazaar") && !cat.includes("village") && !cat.includes("art") && !cat.includes("museum")) return false;
+        if (placeCategoryFilter === "hotel" && !cat.includes("hotel") && !cat.includes("stay") && !cat.includes("resort") && !cat.includes("camp")) return false;
+      }
+      // Query filter
+      if (placeSearchQuery.trim()) {
+        const q = placeSearchQuery.toLowerCase().trim();
+        const matchesName = (place.name || "").toLowerCase().includes(q);
+        const matchesDesc = (place.description || "").toLowerCase().includes(q);
+        const matchesCat = (place.category?.name || "").toLowerCase().includes(q);
+        const matchesAddr = ((place as any).address || "").toLowerCase().includes(q);
+        if (!matchesName && !matchesDesc && !matchesCat && !matchesAddr) return false;
+      }
+      return true;
+    });
+  }, [modalScopeFilter, destinationCandidatePlaces, unscheduledPlacesWithDist, placeCategoryFilter, placeSearchQuery]);
 
   if (loading) {
     return (
@@ -253,10 +545,6 @@ export default function TripDetailPage() {
   const activeItinerary = trip.active_itinerary;
   const days = activeItinerary?.days || [];
   const totalCost = activeItinerary?.total_cost || trip.total_budget;
-  const originCityName =
-    (trip as any)?.context?.origin_city?.split("(")[0]?.trim() ||
-    (trip as any)?.preferences?.origin_city?.split("(")[0]?.trim() ||
-    "Starting City Hub";
   const totalPlaces = days.reduce((acc, d) => acc + d.items.length, 0);
 
   return (
@@ -285,7 +573,7 @@ export default function TripDetailPage() {
                 <span className="inline-flex items-center gap-1.5 px-unit-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider">
                   <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" /> Live Route Validated
                 </span>
-                <span className="font-body-sm text-body-sm text-outline font-mono">Karakoram Sector 04</span>
+                <span className="font-body-sm text-body-sm text-outline font-mono">{destLoc.name} · {destLoc.province} Sector</span>
               </div>
             </div>
 
@@ -304,14 +592,14 @@ export default function TripDetailPage() {
                       {trip.pace} Pace
                     </span>
                     <span className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold">
-                      Solo Explorer
+                      {destInterests.categoryBadge}
                     </span>
                   </div>
                   <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-on-surface tracking-tight leading-tight mt-1">
                     {trip.title}
                   </h1>
                   <p className="font-sans text-sm sm:text-base text-on-surface-variant leading-relaxed">
-                    {activeItinerary?.narrative || "A bespoke algorithmic route along the Karakoram Highway balancing high-altitude panoramic passes, ancient Mir fortresses, and artisanal mountain culinary stops."}
+                    {activeItinerary?.narrative || `A bespoke algorithmic route along the ${routeMetrics.corridorName} balancing ${destLoc.name} landmarks, regional heritage, and authentic culinary stops.`}
                   </p>
                 </div>
 
@@ -383,10 +671,10 @@ export default function TripDetailPage() {
                     </span>
                   </div>
                   <p className="text-sm sm:text-base font-extrabold text-on-surface mt-0.5">
-                    Route Starts From: <span className="text-secondary font-black">{originCityName}</span> → {days.length} Daily Itinerary Clusters
+                    Route Starts From: <span className="text-secondary font-black">{originLoc.name}</span> → <span className="text-on-surface">{destLoc.name}</span> ({days.length} Daily Clusters)
                   </p>
                   <p className="text-xs text-on-surface-variant">
-                    Your custom itinerary plots spatial coordinates from your departure city ({originCityName}) through all planned stops.
+                    Spatial route vector calculated via {routeMetrics.corridorName} ({routeMetrics.drivingDistanceKm} km · ~{routeMetrics.drivingTimeFormatted}).
                   </p>
                 </div>
               </div>
@@ -411,7 +699,9 @@ export default function TripDetailPage() {
                   </div>
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Elevation Gradient</div>
-                    <div className="font-display text-sm font-semibold text-on-surface">2,438m → 4,693m</div>
+                    <div className="font-display text-sm font-semibold text-on-surface">
+                      {originLoc.elevation_m}m → {destLoc.elevation_m}m ({Math.abs(routeMetrics.elevationChangeMeters)}m Δ)
+                    </div>
                   </div>
                 </div>
 
@@ -421,7 +711,7 @@ export default function TripDetailPage() {
                   </div>
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Pacing Index</div>
-                    <div className="font-display text-sm font-semibold text-on-surface capitalize">Optimal Editorial ({trip.pace})</div>
+                    <div className="font-display text-sm font-semibold text-on-surface capitalize">Optimal Dynamic ({trip.pace})</div>
                   </div>
                 </div>
 
@@ -430,14 +720,16 @@ export default function TripDetailPage() {
                     <span className="material-symbols-outlined text-base">explore</span>
                   </div>
                   <div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Road Readiness</div>
-                    <div className="font-display text-sm font-semibold text-on-surface">KKH Cleared • 4WD Recommended</div>
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Corridor Readiness</div>
+                    <div className="font-display text-sm font-semibold text-on-surface">
+                      {routeMetrics.corridorName.split("/")[0]?.trim() || "National Highway"} • {routeMetrics.roadPassabilityPercent}% Passable
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-unit-2 w-full md:w-auto justify-end">
-                <span className="text-xs text-on-surface-variant font-medium">Synched with Gilgit-Baltistan Meteorological Bureau</span>
+                <span className="text-xs text-on-surface-variant font-medium">Synched with {destLoc.province} Regional Meteorological Bureau</span>
                 <span className="w-2 h-2 rounded-full bg-secondary" />
               </div>
             </div>
@@ -478,10 +770,10 @@ export default function TripDetailPage() {
                               <h2 className="font-display font-bold text-base text-on-surface">
                                 {day.date
                                   ? `Day ${day.day_number} — ${new Date(day.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
-                                  : `Day ${day.day_number} — Karakoram Circuit`}
+                                  : `Day ${day.day_number} — ${destLoc.name} Circuit`}
                               </h2>
                               <p className="text-xs text-on-surface-variant">
-                                {day.items[0]?.place.name ? `${day.items[0].place.name} & regional exploration` : "Valley introduction & heritage landmarks"}
+                                {day.items[0]?.place.name ? `${day.items[0].place.name} & regional exploration` : `${destLoc.name} landmarks & cultural stops`}
                               </p>
                             </div>
                           </div>
@@ -505,138 +797,326 @@ export default function TripDetailPage() {
                         {/* Timeline Track Body (When Expanded) */}
                         {isExpanded && (
                           <div className="p-5 sm:p-6 relative">
-                            {/* Continuous vertical timeline background runner */}
-                            <div className="absolute left-[2.45rem] top-8 bottom-12 w-0.5 bg-surface-container-highest -z-0" />
-
-                            <div className="flex flex-col gap-5">
-                              {day.items.map((item, idx) => {
-                                const iconName = getItemIcon(item);
-                                const isLast = idx === day.items.length - 1;
-
-                                return (
-                                  <div key={item.id} className="flex flex-col">
-
-                                    {/* Item Card */}
-                                    <div className="relative flex items-start gap-4 group">
-                                      <div className="w-8 h-8 rounded-full bg-surface-container-lowest border border-secondary/30 text-secondary shadow-sm flex items-center justify-center z-10 shrink-0">
-                                        <span className="material-symbols-outlined text-base">{iconName}</span>
+                            {day.items.length === 0 ? (
+                              /* Empty Day State with Curated Candidate Places */
+                              <div className="flex flex-col gap-4 py-2">
+                                <div className="p-5 sm:p-6 rounded-2xl bg-surface-container-low border border-dashed border-secondary/40 flex flex-col gap-4">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
+                                        <span className="material-symbols-outlined text-2xl">calendar_add_on</span>
                                       </div>
+                                      <div>
+                                        <h3 className="font-display font-bold text-sm sm:text-base text-on-surface">
+                                          Day {day.day_number} is Open
+                                        </h3>
+                                        <p className="text-xs text-on-surface-variant">
+                                          {topRecommendationsForDay.length > 0
+                                            ? `No stops currently scheduled. Select from verified spots in ${destLoc.name} to build Day ${day.day_number}:`
+                                            : `All primary attractions in ${destLoc.name} are already in your itinerary. Use Browse All Spots to explore broader regional options.`}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setActiveAddDay(day.day_number);
+                                        setPlaceSearchQuery("");
+                                        setPlaceCategoryFilter("all");
+                                        setModalScopeFilter(destinationCandidatePlaces.length > 0 ? "destination" : "all");
+                                      }}
+                                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-bold shadow-xs transition-colors cursor-pointer self-start sm:self-auto shrink-0"
+                                      type="button"
+                                    >
+                                      <span className="material-symbols-outlined text-base">add_location_alt</span>
+                                      <span>Browse All Spots</span>
+                                    </button>
+                                  </div>
 
-                                      <div className="flex-1 bg-surface-container-low border border-outline-variant/50 hover:bg-surface-container-high/70 rounded-xl p-4 transition-all shadow-xs">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
-                                          <div className="flex items-center gap-2.5">
-                                            <span className="font-mono text-xs font-bold text-secondary">
-                                              {item.start_time || "09:00 AM"}
-                                            </span>
-                                            <span className="w-1 h-1 rounded-full bg-outline" />
-                                            <h3 className="font-display font-semibold text-sm sm:text-base text-on-surface">
-                                              {item.place.name}
-                                            </h3>
+                                  {/* Suggestions Grid */}
+                                  {topRecommendationsForDay.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                      {topRecommendationsForDay.slice(0, 4).map(({ place, distanceKm }) => {
+                                        const isAdding = addingPlaceId === place.id;
+                                        return (
+                                          <div
+                                            key={place.id}
+                                            className="bg-surface-container-lowest rounded-xl p-3.5 border border-outline-variant/60 hover:border-secondary/40 transition-all flex flex-col justify-between gap-3 shadow-2xs group"
+                                          >
+                                            <div className="flex items-start gap-3">
+                                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-surface-container shrink-0 relative border border-outline-variant/30">
+                                                {place.primary_image?.url ? (
+                                                  <img
+                                                    src={place.primary_image.url}
+                                                    alt={place.name}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                  />
+                                                ) : (
+                                                  <div className="w-full h-full flex items-center justify-center text-secondary">
+                                                    <span className="material-symbols-outlined text-2xl">landscape</span>
+                                                  </div>
+                                                )}
+                                                <div className="absolute top-1 left-1 px-1 py-0.2 rounded bg-black/60 text-white font-mono text-[8px] font-bold">
+                                                  ★ {place.popularity_score || 85}
+                                                </div>
+                                              </div>
+
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-[9px] font-bold uppercase tracking-wider text-secondary bg-secondary/10 px-1.5 py-0.5 rounded">
+                                                    {place.category?.name || "Spot"}
+                                                  </span>
+                                                  {place.average_visit_duration_minutes && (
+                                                    <span className="text-[9px] text-outline font-mono">
+                                                      {place.average_visit_duration_minutes}m
+                                                    </span>
+                                                  )}
+                                                  {distanceKm !== null && (
+                                                    <span className="text-[9px] text-outline font-mono">
+                                                      • {distanceKm < 1 ? "<1" : distanceKm.toFixed(0)}km
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <h4 className="font-display font-bold text-xs sm:text-sm text-on-surface truncate mt-0.5">
+                                                  {place.name}
+                                                </h4>
+                                                <p className="text-[11px] text-on-surface-variant line-clamp-1">
+                                                  {place.description || `Verified spot in ${destLoc.name}`}
+                                                </p>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+                                              <span className="text-[11px] font-semibold text-on-surface">
+                                                {place.estimated_cost_max
+                                                  ? `Rs. ${place.estimated_cost_max.toLocaleString()}`
+                                                  : "Free Entry"}
+                                              </span>
+
+                                              <button
+                                                disabled={isAdding}
+                                                onClick={() => handleAddStop(place.id, day.day_number)}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-secondary text-white hover:bg-secondary-dark text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                                type="button"
+                                              >
+                                                {isAdding ? (
+                                                  <>
+                                                    <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                    <span>Adding...</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <span className="material-symbols-outlined text-xs">add</span>
+                                                    <span>Add to Day {day.day_number}</span>
+                                                  </>
+                                                )}
+                                              </button>
+                                            </div>
                                           </div>
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-[11px] text-outline">
-                                              {item.visit_duration_minutes} min duration
-                                            </span>
-                                            <span className="font-display text-sm font-semibold text-on-surface">
-                                              Rs. {(item.estimated_cost || item.place.estimated_cost_min || 0).toLocaleString()}
-                                            </span>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Continuous vertical timeline background runner */}
+                                <div className="absolute left-[2.45rem] top-8 bottom-16 w-0.5 bg-surface-container-highest -z-0" />
+
+                                <div className="flex flex-col gap-5">
+                                  {day.items.map((item, idx) => {
+                                    const iconName = getItemIcon(item);
+                                    const isLast = idx === day.items.length - 1;
+                                    const isDeleting = deletingStopId === item.id;
+
+                                    return (
+                                      <div key={item.id} className="flex flex-col">
+
+                                        {/* Item Card */}
+                                        <div className="relative flex items-start gap-4 group">
+                                          <div className="w-8 h-8 rounded-full bg-surface-container-lowest border border-secondary/30 text-secondary shadow-sm flex items-center justify-center z-10 shrink-0">
+                                            <span className="material-symbols-outlined text-base">{iconName}</span>
+                                          </div>
+
+                                          <div className="flex-1 bg-surface-container-low border border-outline-variant/50 hover:bg-surface-container-high/70 rounded-xl p-4 transition-all shadow-xs">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
+                                              <div className="flex items-center gap-2.5">
+                                                <span className="font-mono text-xs font-bold text-secondary">
+                                                  {item.start_time || "09:00 AM"}
+                                                </span>
+                                                <span className="w-1 h-1 rounded-full bg-outline" />
+                                                <h3 className="font-display font-semibold text-sm sm:text-base text-on-surface">
+                                                  {item.place.name}
+                                                </h3>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-[11px] text-outline">
+                                                  {item.visit_duration_minutes} min duration
+                                                </span>
+                                                <span className="font-display text-sm font-semibold text-on-surface">
+                                                  Rs. {(item.estimated_cost || item.place.estimated_cost_min || 0).toLocaleString()}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-3">
+                                              {item.notes || item.place.category?.name + " location with high cultural and scenic significance."}
+                                            </p>
+
+                                            {/* Image preview if available */}
+                                            {item.place.primary_image?.url && (
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                                <div className="rounded-lg overflow-hidden h-32 relative border border-outline-variant/40">
+                                                  <img
+                                                    src={item.place.primary_image.url}
+                                                    alt={item.place.name}
+                                                    className="w-full h-full object-cover"
+                                                  />
+                                                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-primary/80 backdrop-blur-md text-on-primary font-mono text-[10px] font-bold">
+                                                    Verified Spot
+                                                  </div>
+                                                </div>
+                                                <div className="bg-surface-container-lowest rounded-lg p-3 border border-outline-variant/40 flex flex-col justify-between">
+                                                  <div>
+                                                    <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold block mb-1">Curator Note</span>
+                                                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                                                      Optimal visiting window during daytime hours. Excellent photography and regional landmark.
+                                                    </p>
+                                                  </div>
+                                                  <Link href={`/places/${item.place.id}`} className="flex items-center gap-1 text-secondary text-xs font-semibold hover:underline pt-2">
+                                                    <span>View Location Details</span>
+                                                    <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                                                  </Link>
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            <div className="flex items-center justify-between pt-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-on-surface px-2 py-0.5 rounded bg-surface-container-highest border border-outline-variant/40">
+                                                  <span className="material-symbols-outlined text-xs text-secondary">verified</span>
+                                                  {item.place.category?.name || "Curated Point"}
+                                                </span>
+                                                {item.place.indoor_outdoor && (
+                                                  <span className="text-[11px] text-outline capitalize font-medium">
+                                                    {item.place.indoor_outdoor}
+                                                  </span>
+                                                )}
+                                              </div>
+
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  onClick={() => handleRemoveStop(item.id, item.place.name, day.day_number)}
+                                                  disabled={isDeleting}
+                                                  className="inline-flex items-center gap-1 text-xs text-on-surface-variant hover:text-error hover:bg-error/10 px-2 py-1 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-error/20"
+                                                  type="button"
+                                                  title="Remove this stop from itinerary"
+                                                >
+                                                  {isDeleting ? (
+                                                    <span className="w-3.5 h-3.5 border-2 border-error/30 border-t-error rounded-full animate-spin" />
+                                                  ) : (
+                                                    <span className="material-symbols-outlined text-sm text-error">delete</span>
+                                                  )}
+                                                  <span className="text-[11px] text-error font-medium">Remove</span>
+                                                </button>
+                                                <Link href={`/places/${item.place.id}`} className="text-secondary text-xs font-semibold hover:underline">
+                                                  Details →
+                                                </Link>
+                                              </div>
+                                            </div>
                                           </div>
                                         </div>
 
-                                        <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-3">
-                                          {item.notes || item.place.category?.name + " location with high cultural and scenic significance."}
-                                        </p>
-
-                                        {/* Image preview if available */}
-                                        {item.place.primary_image?.url && (
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                            <div className="rounded-lg overflow-hidden h-32 relative border border-outline-variant/40">
-                                              <img
-                                                src={item.place.primary_image.url}
-                                                alt={item.place.name}
-                                                className="w-full h-full object-cover"
-                                              />
-                                              <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-primary/80 backdrop-blur-md text-on-primary font-mono text-[10px] font-bold">
-                                                Verified Spot
+                                        {/* Contextual Afternoon Swap Banner (on Day 1 after 2nd item) */}
+                                        {day.day_number === 1 && idx === 2 && (
+                                          <div className="my-3 ml-12 p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-7 h-7 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed shrink-0 text-xs">
+                                                ✨
                                               </div>
-                                            </div>
-                                            <div className="bg-surface-container-lowest rounded-lg p-3 border border-outline-variant/40 flex flex-col justify-between">
                                               <div>
-                                                <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold block mb-1">Curator Note</span>
-                                                <p className="text-xs text-on-surface-variant leading-relaxed">
-                                                  High scenic value during early daylight hours. Perfect for travel photography.
-                                                </p>
+                                                <div className="font-display font-semibold text-xs text-on-surface">Feeling low energy or dynamic weather incoming?</div>
+                                                <div className="text-[11px] text-on-surface-variant">Swap afternoon excursion for gentle indoor cultural workshop in {destLoc.name}.</div>
                                               </div>
-                                              <Link href={`/places/${item.place.id}`} className="flex items-center gap-1 text-secondary text-xs font-semibold hover:underline pt-2">
-                                                <span>View Location Details</span>
-                                                <span className="material-symbols-outlined text-xs">arrow_forward</span>
-                                              </Link>
                                             </div>
+                                            <button
+                                              onClick={() => setSwapModalOpen(true)}
+                                              className="px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto border border-outline-variant/40"
+                                              type="button"
+                                            >
+                                              Change afternoon
+                                            </button>
                                           </div>
                                         )}
 
-                                        <div className="flex items-center justify-between pt-1">
-                                          <div className="flex items-center gap-2">
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-on-surface px-2 py-0.5 rounded bg-surface-container-highest border border-outline-variant/40">
-                                              <span className="material-symbols-outlined text-xs text-secondary">verified</span>
-                                              {item.place.category?.name || "Curated Point"}
-                                            </span>
-                                            {item.place.indoor_outdoor && (
-                                              <span className="text-[11px] text-outline capitalize font-medium">
-                                                {item.place.indoor_outdoor}
+                                        {/* Transit Connector between items */}
+                                        {!isLast && (
+                                          <div className="relative flex items-center gap-4 pl-7 py-1.5">
+                                            <div className="w-4 flex justify-center">
+                                              <span className="material-symbols-outlined text-xs text-outline">more_vert</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-mono text-[11px] text-outline">
+                                              <span className="material-symbols-outlined text-xs">directions_car</span>
+                                              <span>
+                                                {day.items[idx + 1]?.travel_time_from_prev_minutes || 15} min transit
+                                                {day.items[idx + 1]?.travel_distance_from_prev_km
+                                                  ? ` • ${day.items[idx + 1].travel_distance_from_prev_km?.toFixed(1)} km`
+                                                  : " • 3.5 km drive"}
                                               </span>
-                                            )}
+                                            </div>
                                           </div>
-                                          <Link href={`/places/${item.place.id}`} className="text-secondary text-xs font-semibold hover:underline">
-                                            Details →
-                                          </Link>
-                                        </div>
+                                        )}
                                       </div>
-                                    </div>
+                                    );
+                                  })}
+                                </div>
 
-                                    {/* Contextual Afternoon Swap Banner (on Day 1 after 2nd item) */}
-                                    {day.day_number === 1 && idx === 2 && (
-                                      <div className="my-3 ml-12 p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-7 h-7 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed shrink-0 text-xs">
-                                            ✨
-                                          </div>
-                                          <div>
-                                            <div className="font-display font-semibold text-xs text-on-surface">Feeling low energy or rain incoming?</div>
-                                            <div className="text-[11px] text-on-surface-variant">Swap afternoon hike for silk road gem cutting workshop.</div>
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => setSwapModalOpen(true)}
-                                          className="px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto border border-outline-variant/40"
-                                          type="button"
-                                        >
-                                          Change afternoon
-                                        </button>
-                                      </div>
-                                    )}
-
-                                    {/* Transit Connector between items */}
-                                    {!isLast && (
-                                      <div className="relative flex items-center gap-4 pl-7 py-1.5">
-                                        <div className="w-4 flex justify-center">
-                                          <span className="material-symbols-outlined text-xs text-outline">more_vert</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 font-mono text-[11px] text-outline">
-                                          <span className="material-symbols-outlined text-xs">directions_car</span>
-                                          <span>
-                                            {day.items[idx + 1]?.travel_time_from_prev_minutes || 15} min transit
-                                            {day.items[idx + 1]?.travel_distance_from_prev_km
-                                              ? ` • ${day.items[idx + 1].travel_distance_from_prev_km?.toFixed(1)} km`
-                                              : " • 3.5 km drive"}
-                                          </span>
-                                        </div>
-                                      </div>
+                                {/* Day Footer: Quick-Add Suggestions and Add Stop Button */}
+                                <div className="mt-5 pt-4 border-t border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                                    {topRecommendationsForDay.length > 0 && (
+                                      <>
+                                        <span className="text-[11px] font-mono text-outline shrink-0">Quick Add:</span>
+                                        {topRecommendationsForDay.slice(0, 3).map(({ place }) => {
+                                          const isAdding = addingPlaceId === place.id;
+                                          return (
+                                            <button
+                                              key={place.id}
+                                              disabled={isAdding}
+                                              onClick={() => handleAddStop(place.id, day.day_number)}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-low hover:bg-secondary/15 text-on-surface hover:text-secondary text-[11px] font-medium transition-colors border border-outline-variant/40 shrink-0 cursor-pointer disabled:opacity-50"
+                                              type="button"
+                                              title={`Add ${place.name} to Day ${day.day_number}`}
+                                            >
+                                              {isAdding ? (
+                                                <span className="w-2.5 h-2.5 border border-secondary border-t-transparent rounded-full animate-spin" />
+                                              ) : (
+                                                <span className="material-symbols-outlined text-xs text-secondary">add</span>
+                                              )}
+                                              <span className="truncate max-w-[120px]">{place.name}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </>
                                     )}
                                   </div>
-                                );
-                              })}
-                            </div>
+
+                                  <button
+                                    onClick={() => {
+                                      setActiveAddDay(day.day_number);
+                                      setPlaceSearchQuery("");
+                                      setPlaceCategoryFilter("all");
+                                      setModalScopeFilter(destinationCandidatePlaces.length > 0 ? "destination" : "all");
+                                    }}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all shadow-2xs border border-outline-variant/60 cursor-pointer shrink-0"
+                                    type="button"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">add_location_alt</span>
+                                    <span>+ Add Stop to Day {day.day_number}</span>
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -727,14 +1207,14 @@ export default function TripDetailPage() {
                     <div className="flex flex-col gap-0.5">
                       <span className="font-display font-semibold text-xs text-on-surface">AI Budget Arbitrage</span>
                       <p className="text-xs text-on-surface-variant leading-relaxed">
-                        Save <strong className="text-secondary font-semibold">Rs. 4,200</strong> by pairing into a verified 2-person shared transport cluster for Day 2.
+                        Save <strong className="text-secondary font-semibold">Rs. 4,200</strong> by booking verified regional partner stays for {destLoc.name}.
                       </p>
                       <button
-                        onClick={() => alert("Shared booking discount code applied to itinerary budget!")}
+                        onClick={() => alert("Shared booking discount applied to itinerary budget!")}
                         className="text-secondary text-xs font-semibold hover:underline mt-1 self-start cursor-pointer"
                         type="button"
                       >
-                        Apply Shared Booking →
+                        Apply Partner Discount →
                       </button>
                     </div>
                   </div>
@@ -744,53 +1224,30 @@ export default function TripDetailPage() {
                 <div className="bg-surface-container-lowest rounded-xl p-5 shadow-sm border border-outline-variant/60 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <h2 className="font-display font-bold text-base text-on-surface">Weather &amp; Gear Matrix</h2>
-                    <span className="text-xs text-outline font-mono">Karakoram Core</span>
+                    <span className="text-xs text-outline font-mono">{destLoc.name} ({climateMetrics.seasonTag})</span>
                   </div>
 
                   {/* 4-Day Mini Forecast Strip */}
                   <div className="grid grid-cols-4 gap-1.5 bg-surface-container-low rounded-lg p-2.5 text-center border border-outline-variant/30">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="font-mono text-[10px] text-outline font-semibold">D1</span>
-                      <span className="material-symbols-outlined text-secondary text-base">sunny</span>
-                      <span className="font-display text-[11px] font-semibold text-on-surface">21° / 8°</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="font-mono text-[10px] text-outline font-semibold">D2</span>
-                      <span className="material-symbols-outlined text-secondary text-base">partly_cloudy_day</span>
-                      <span className="font-display text-[11px] font-semibold text-on-surface">19° / 7°</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="font-mono text-[10px] text-outline font-semibold">D3</span>
-                      <span className="material-symbols-outlined text-outline text-base">air</span>
-                      <span className="font-display text-[11px] font-semibold text-on-surface">16° / 5°</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="font-mono text-[10px] text-outline font-semibold">D4 (Pass)</span>
-                      <span className="material-symbols-outlined text-secondary text-base">ac_unit</span>
-                      <span className="font-display text-[11px] font-semibold text-on-surface">-2° / -9°</span>
-                    </div>
+                    {miniForecast.map((f, i) => (
+                      <div key={i} className="flex flex-col items-center gap-0.5">
+                        <span className="font-mono text-[10px] text-outline font-semibold">{f.day}</span>
+                        <span className="material-symbols-outlined text-secondary text-base">{f.icon}</span>
+                        <span className="font-display text-[11px] font-semibold text-on-surface">{f.high}° / {f.low}°</span>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Recommended Gear List */}
                   <div>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold block mb-2">Calculated Pack Essentials</span>
                     <div className="flex flex-col gap-2 text-xs">
-                      <label className="flex items-center gap-2.5 text-on-surface cursor-pointer">
-                        <input defaultChecked className="w-3.5 h-3.5 rounded text-secondary accent-secondary" type="checkbox" />
-                        <span>Thermal mid-layer &amp; fleece (Khunjerab Pass)</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 text-on-surface cursor-pointer">
-                        <input defaultChecked className="w-3.5 h-3.5 rounded text-secondary accent-secondary" type="checkbox" />
-                        <span>Wide-angle lens (16-35mm) + Circular Polarizer</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 text-on-surface cursor-pointer">
-                        <input defaultChecked className="w-3.5 h-3.5 rounded text-secondary accent-secondary" type="checkbox" />
-                        <span>High-altitude SPF 50+ &amp; UV Lip Protectant</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 text-on-surface cursor-pointer">
-                        <input className="w-3.5 h-3.5 rounded text-secondary accent-secondary" type="checkbox" />
-                        <span>Ankle-support vibram sole trekking boots</span>
-                      </label>
+                      {packingGear.map((item, idx) => (
+                        <label key={idx} className="flex items-center gap-2.5 text-on-surface cursor-pointer">
+                          <input defaultChecked={item.checked} className="w-3.5 h-3.5 rounded text-secondary accent-secondary" type="checkbox" />
+                          <span>{item.label}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -802,12 +1259,12 @@ export default function TripDetailPage() {
                       <span className="material-symbols-outlined text-base">smart_toy</span>
                     </div>
                     <div>
-                      <h2 className="font-display font-bold text-sm text-on-surface">Hunza AI Concierge</h2>
-                      <span className="text-[11px] text-outline">Real-time Karakoram Sentinel</span>
+                      <h2 className="font-display font-bold text-sm text-on-surface">{destLoc.name} AI Concierge</h2>
+                      <span className="text-[11px] text-outline">Real-time {destLoc.province} Route Sentinel</span>
                     </div>
                   </div>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Ask any question about checkpoint permits, fuel availability, altitude, or local customs.
+                    Ask any question about road access, fuel availability, weather, or local {destLoc.name} recommendations.
                   </p>
 
                   {/* Chat Messages */}
@@ -833,28 +1290,28 @@ export default function TripDetailPage() {
                   {/* Interactive Quick Prompt Bubbles */}
                   <div className="flex flex-col gap-1.5">
                     <button
-                      onClick={() => handleConciergeSend("Road status: Gilgit → Karimabad")}
+                      onClick={() => handleConciergeSend(`Road & passability status: ${originLoc.name} → ${destLoc.name}`)}
                       className="w-full text-left p-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high transition-colors text-xs text-on-surface flex items-center justify-between cursor-pointer border border-outline-variant/30"
                       type="button"
                     >
-                      <span>Road status: Gilgit → Karimabad</span>
-                      <span className="material-symbols-outlined text-sm text-outline">arrow_forward</span>
+                      <span className="truncate">Road status: {originLoc.name} → {destLoc.name}</span>
+                      <span className="material-symbols-outlined text-sm text-outline shrink-0">arrow_forward</span>
                     </button>
                     <button
-                      onClick={() => handleConciergeSend("Best sunset spot if cloudy at Eagle's Nest?")}
+                      onClick={() => handleConciergeSend(`Best photography & sunset spots in ${destLoc.name}`)}
                       className="w-full text-left p-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high transition-colors text-xs text-on-surface flex items-center justify-between cursor-pointer border border-outline-variant/30"
                       type="button"
                     >
-                      <span>Best sunset spot if cloudy at Eagle's Nest?</span>
-                      <span className="material-symbols-outlined text-sm text-outline">arrow_forward</span>
+                      <span className="truncate">Best sunset spots in {destLoc.name}</span>
+                      <span className="material-symbols-outlined text-sm text-outline shrink-0">arrow_forward</span>
                     </button>
                     <button
-                      onClick={() => handleConciergeSend("Can I withdraw cash at Aliabad ATM today?")}
+                      onClick={() => handleConciergeSend(`Top culinary & food specialties to try in ${destLoc.name}`)}
                       className="w-full text-left p-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high transition-colors text-xs text-on-surface flex items-center justify-between cursor-pointer border border-outline-variant/30"
                       type="button"
                     >
-                      <span>Can I withdraw cash at Aliabad ATM today?</span>
-                      <span className="material-symbols-outlined text-sm text-outline">arrow_forward</span>
+                      <span className="truncate">Top food specialties in {destLoc.name}</span>
+                      <span className="material-symbols-outlined text-sm text-outline shrink-0">arrow_forward</span>
                     </button>
                   </div>
 
@@ -870,7 +1327,7 @@ export default function TripDetailPage() {
                       value={conciergeMessage}
                       onChange={(e) => setConciergeMessage(e.target.value)}
                       className="w-full pl-3.5 pr-9 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 text-on-surface placeholder-outline text-xs focus:outline-none focus:bg-surface-container-lowest focus:ring-1 focus:ring-secondary transition-all"
-                      placeholder="Ask WanderAI anything about this route..."
+                      placeholder={`Ask WanderAI about ${destLoc.name}...`}
                       type="text"
                     />
                     <button
@@ -928,7 +1385,7 @@ export default function TripDetailPage() {
                 </div>
                 <div>
                   <h3 className="font-headline-md text-headline-md text-on-surface">Re-Synthesize Afternoon</h3>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Day 1 • Karimabad &amp; Altit Sector</p>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">Day 1 • {destLoc.name} Sector</p>
                 </div>
               </div>
               <button
@@ -953,7 +1410,7 @@ export default function TripDetailPage() {
                 />
                 <div className="flex-1">
                   <div className="font-title-md text-title-md text-on-surface">Lower Energy / Gentle Pacing</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">Replace steep Altit cobblestone walk with royal garden kehwa tasting &amp; carpet weaver atelier.</div>
+                  <div className="font-body-sm text-body-sm text-on-surface-variant">Replace outdoor walking with local heritage garden tea tasting &amp; artisanal craft workshop.</div>
                 </div>
               </label>
 
@@ -967,7 +1424,7 @@ export default function TripDetailPage() {
                 />
                 <div className="flex-1">
                   <div className="font-title-md text-title-md text-on-surface">Inclement / Overcast Weather</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">Swap Eagle's Nest sunset for covered Ganish rock art conservation gallery &amp; local storytelling.</div>
+                  <div className="font-body-sm text-body-sm text-on-surface-variant">Swap exposed viewpoint for indoor museum gallery &amp; historical exhibition in {destLoc.name}.</div>
                 </div>
               </label>
 
@@ -981,7 +1438,7 @@ export default function TripDetailPage() {
                 />
                 <div className="flex-1">
                   <div className="font-title-md text-title-md text-on-surface">Photography Priority</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">Advance to high shepherd huts at Duikar 1.5 hours earlier for soft pre-sunset shadow gradients.</div>
+                  <div className="font-body-sm text-body-sm text-on-surface-variant">Advance to golden hour vantage point 1.5 hours earlier for soft pre-sunset lighting.</div>
                 </div>
               </label>
             </div>
@@ -1075,6 +1532,262 @@ export default function TripDetailPage() {
           </button>
         </form>
       </div>
+
+      {/* ==================== ADD STOP TO DAY MODAL ==================== */}
+      {activeAddDay !== null && (
+        <div className="fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-surface-container-lowest w-full max-w-3xl max-h-[90vh] rounded-3xl p-6 sm:p-7 shadow-2xl border border-outline-variant/60 flex flex-col gap-4 relative overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-secondary text-white flex items-center justify-center shadow-xs">
+                  <span className="material-symbols-outlined text-xl">add_location_alt</span>
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base sm:text-lg text-on-surface">
+                    Add Stop to Day {activeAddDay}
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">
+                    Browse and select from verified attractions, viewpoints, stays, and dining in {destLoc.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveAddDay(null)}
+                className="w-9 h-9 rounded-xl hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {/* Search & Scope Tabs Filter Bar */}
+            <div className="flex flex-col gap-3">
+              {/* Scope Switcher Tabs */}
+              <div className="flex items-center p-1 bg-surface-container-low rounded-xl border border-outline-variant/50 w-full sm:w-fit">
+                <button
+                  type="button"
+                  onClick={() => setModalScopeFilter("destination")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    modalScopeFilter === "destination"
+                      ? "bg-secondary text-white shadow-xs"
+                      : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-sm">location_on</span>
+                  <span>In &amp; Around {destLoc.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    modalScopeFilter === "destination" ? "bg-white/20 text-white" : "bg-surface-container-high text-outline"
+                  }`}>
+                    {destinationCandidatePlaces.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalScopeFilter("all")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    modalScopeFilter === "all"
+                      ? "bg-secondary text-white shadow-xs"
+                      : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-sm">public</span>
+                  <span>All Pakistan</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    modalScopeFilter === "all" ? "bg-white/20 text-white" : "bg-surface-container-high text-outline"
+                  }`}>
+                    {unscheduledPlacesWithDist.length}
+                  </span>
+                </button>
+              </div>
+
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-outline text-lg">
+                  search
+                </span>
+                <input
+                  value={placeSearchQuery}
+                  onChange={(e) => setPlaceSearchQuery(e.target.value)}
+                  placeholder={
+                    modalScopeFilter === "destination"
+                      ? `Search attractions in ${destLoc.name}...`
+                      : "Search across all destinations in Pakistan..."
+                  }
+                  className="w-full pl-10 pr-14 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/60 text-xs sm:text-sm text-on-surface placeholder-outline focus:outline-none focus:ring-1 focus:ring-secondary focus:bg-surface-container-lowest transition-all"
+                  type="text"
+                />
+                {placeSearchQuery && (
+                  <button
+                    onClick={() => setPlaceSearchQuery("")}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface text-xs font-semibold cursor-pointer"
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                {[
+                  { id: "all", label: "All Spots", icon: "explore" },
+                  { id: "heritage", label: "Heritage & Forts", icon: "fort" },
+                  { id: "nature", label: "Nature & Lakes", icon: "landscape" },
+                  { id: "food", label: "Dining & Cafes", icon: "restaurant" },
+                  { id: "culture", label: "Culture & Bazaars", icon: "holiday_village" },
+                  { id: "hotel", label: "Stays & Resorts", icon: "hotel" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setPlaceCategoryFilter(cat.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+                      placeCategoryFilter === cat.id
+                        ? "bg-secondary text-white shadow-xs"
+                        : "bg-surface-container text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
+                    }`}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-sm">{cat.icon}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Candidate Places List / Grid */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3 min-h-[260px] max-h-[50vh]">
+              {placesLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-outline">
+                  <span className="w-6 h-6 border-2 border-secondary/30 border-t-secondary rounded-full animate-spin" />
+                  <span className="text-xs">Loading verified places...</span>
+                </div>
+              ) : modalCandidatePlaces.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center gap-2 bg-surface-container-low rounded-2xl border border-outline-variant/40">
+                  <span className="material-symbols-outlined text-3xl text-outline">travel_explore</span>
+                  <p className="text-xs font-semibold text-on-surface">No matching places found</p>
+                  <p className="text-[11px] text-on-surface-variant max-w-xs">
+                    {modalScopeFilter === "destination"
+                      ? `No additional spots found for ${destLoc.name}. Try switching to "All Pakistan" above to browse wider options.`
+                      : "Try adjusting your search query or switching category filters."}
+                  </p>
+                  {modalScopeFilter === "destination" && (
+                    <button
+                      onClick={() => setModalScopeFilter("all")}
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-secondary text-white text-xs font-semibold hover:bg-secondary-dark transition-colors cursor-pointer"
+                      type="button"
+                    >
+                      Search All Pakistan
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {modalCandidatePlaces.map(({ place, distanceKm }) => {
+                    const isAdding = addingPlaceId === place.id;
+                    return (
+                      <div
+                        key={place.id}
+                        className="bg-surface-container-low hover:bg-surface-container-high/60 border border-outline-variant/60 rounded-2xl p-3.5 flex flex-col justify-between gap-3 transition-all group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-surface-container-high shrink-0 relative border border-outline-variant/30">
+                            {place.primary_image?.url ? (
+                              <img
+                                src={place.primary_image.url}
+                                alt={place.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-secondary">
+                                <span className="material-symbols-outlined text-2xl">landscape</span>
+                              </div>
+                            )}
+                            <div className="absolute top-1 left-1 px-1 py-0.2 rounded bg-black/60 text-white font-mono text-[8px] font-bold">
+                              ★ {place.popularity_score || 85}
+                            </div>
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-secondary bg-secondary/10 px-1.5 py-0.5 rounded">
+                                {place.category?.name || "Spot"}
+                              </span>
+                              {distanceKm !== null && (
+                                <span className="text-[9px] text-outline font-mono">
+                                  • {distanceKm < 1 ? "<1 km" : `${distanceKm.toFixed(0)} km`}
+                                </span>
+                              )}
+                              {place.indoor_outdoor && (
+                                <span className="text-[9px] text-outline capitalize">
+                                  • {place.indoor_outdoor}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-display font-bold text-xs sm:text-sm text-on-surface truncate mt-0.5">
+                              {place.name}
+                            </h4>
+                            <p className="text-[11px] text-on-surface-variant line-clamp-2 leading-tight">
+                              {place.description || `Verified landmark located in ${destLoc.name}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-outline-variant/40">
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="font-semibold text-on-surface">
+                              {place.estimated_cost_max
+                                ? `Rs. ${place.estimated_cost_max.toLocaleString()}`
+                                : "Free Entry"}
+                            </span>
+                            {place.average_visit_duration_minutes && (
+                              <span className="text-outline font-mono">
+                                • {place.average_visit_duration_minutes} min
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            disabled={isAdding}
+                            onClick={() => handleAddStop(place.id, activeAddDay)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                            type="button"
+                          >
+                            {isAdding ? (
+                              <>
+                                <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                <span>Adding...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined text-xs">add</span>
+                                <span>Add to Day {activeAddDay}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-2 border-t border-outline-variant/60 text-xs">
+              <span className="text-outline font-mono">
+                {modalCandidatePlaces.length} candidate location{modalCandidatePlaces.length !== 1 ? "s" : ""} available
+              </span>
+              <button
+                onClick={() => setActiveAddDay(null)}
+                className="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold transition-colors cursor-pointer"
+                type="button"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==================== REOPTIMIZE MODAL ==================== */}
       {showReoptimize && (

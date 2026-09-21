@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { tripsApi, getErrorMessage } from "@/lib/api";
 import { Trip } from "@/types";
 import Navbar from "@/components/Navbar";
+import {
+  findPakistanLocation,
+  calculateRouteMetrics,
+  getDestinationClimate,
+  PAKISTAN_LOCATIONS,
+} from "@/lib/pakistanGeo";
 
 export default function TripsPage() {
   const router = useRouter();
@@ -56,13 +62,69 @@ export default function TripsPage() {
     return true;
   });
 
+  // Helper to compute realistic distance for any trip
+  const getTripDistance = (trip: Trip) => {
+    const raw = Math.round(trip.active_itinerary?.total_travel_distance_km || 0);
+    if (raw > 0) return raw;
+
+    const originName =
+      (trip as any)?.preferences?.origin_city?.split("(")[0]?.trim() ||
+      (trip as any)?.context?.origin_city?.split("(")[0]?.trim() ||
+      "Islamabad";
+    const destName =
+      (trip as any)?.preferences?.destination?.split("(")[0]?.trim() ||
+      (trip as any)?.context?.destination?.split("(")[0]?.trim() ||
+      trip.title
+        .replace(/\d+-Day/gi, "")
+        .replace(/Expedition|Tour|Trip|Getaway|Circuit/gi, "")
+        .replace(/from.*/gi, "")
+        .trim() ||
+      "Bahawalpur";
+
+    const oLoc = findPakistanLocation(originName) || PAKISTAN_LOCATIONS[0];
+    const dLoc = findPakistanLocation(destName) || PAKISTAN_LOCATIONS[1];
+    const metrics = calculateRouteMetrics(oLoc, dLoc);
+    return metrics.drivingDistanceKm;
+  };
+
   // Calculate Aggregates
   const totalCapital = trips.reduce((acc, t) => acc + (t.total_budget || 0), 0);
-  const totalKm = trips.reduce(
-    (acc, t) => acc + Math.round(t.active_itinerary?.total_travel_distance_km || 0),
-    0
-  );
+  const totalKm = trips.reduce((acc, t) => acc + getTripDistance(t), 0);
   const activeTrip = trips.length > 0 ? trips[0] : null;
+
+  // Derive dynamic telemetry for the featured active trip
+  const activeOriginLoc = useMemo(() => {
+    if (!activeTrip) return null;
+    const originName =
+      (activeTrip as any)?.preferences?.origin_city?.split("(")[0]?.trim() ||
+      (activeTrip as any)?.context?.origin_city?.split("(")[0]?.trim() ||
+      "Islamabad";
+    return findPakistanLocation(originName);
+  }, [activeTrip]);
+
+  const activeDestLoc = useMemo(() => {
+    if (!activeTrip) return null;
+    const destName =
+      (activeTrip as any)?.preferences?.destination?.split("(")[0]?.trim() ||
+      (activeTrip as any)?.context?.destination?.split("(")[0]?.trim() ||
+      activeTrip.title
+        .replace(/\d+-Day/gi, "")
+        .replace(/Expedition|Tour|Trip|Getaway|Circuit/gi, "")
+        .replace(/from.*/gi, "")
+        .trim() ||
+      "Hunza Valley";
+    return findPakistanLocation(destName);
+  }, [activeTrip]);
+
+  const activeRouteMetrics = useMemo(() => {
+    if (!activeOriginLoc || !activeDestLoc || !activeTrip) return null;
+    return calculateRouteMetrics(activeOriginLoc, activeDestLoc);
+  }, [activeOriginLoc, activeDestLoc, activeTrip]);
+
+  const activeClimate = useMemo(() => {
+    if (!activeDestLoc || !activeTrip) return null;
+    return getDestinationClimate(activeDestLoc, activeTrip.start_date);
+  }, [activeDestLoc, activeTrip]);
 
   return (
     <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col">
@@ -77,8 +139,6 @@ export default function TripsPage() {
           {/* SECTION 1: COMMAND HEADER & BREADCRUMB */}
           <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8  pb-6">
             <div className="flex flex-col gap-6">
-
-
 
               {/* Title & Primary Control Buttons */}
               <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
@@ -284,7 +344,7 @@ export default function TripsPage() {
           ) : (
             <>
               {/* SECTION 3: FEATURED ACTIVE EXPEDITION BANNER (First Trip) */}
-              {activeTrip && (
+              {activeTrip && activeDestLoc && (
                 <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
                   <div className="relative rounded-2xl bg-surface-container-lowest p-6 sm:p-8 border border-outline-variant/60 shadow-xs overflow-hidden">
                     <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-secondary via-secondary-container to-secondary" />
@@ -319,8 +379,8 @@ export default function TripsPage() {
                               <span className="material-symbols-outlined text-base text-secondary">alt_route</span>
                               <span>
                                 {activeTrip.active_itinerary?.days[0]?.items[0]?.place.name
-                                  ? `${activeTrip.active_itinerary.days[0].items[0].place.name} → Regional Route`
-                                  : "Optimized High Altitude Travel Corridor"}
+                                  ? `${activeTrip.active_itinerary.days[0].items[0].place.name} → ${activeDestLoc.name} Route`
+                                  : `${activeDestLoc.name} · ${activeDestLoc.province} Corridor`}
                               </span>
                             </p>
                           </div>
@@ -330,17 +390,17 @@ export default function TripsPage() {
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2 font-display text-sm font-bold text-on-surface">
                                 <span className="material-symbols-outlined text-base text-secondary">my_location</span>
-                                <span>Karakoram Sector</span>
+                                <span>{activeDestLoc.name} · {activeDestLoc.province} Sector</span>
                                 <span className="text-on-surface-variant font-normal">· Live Status</span>
                               </div>
                               <div className="flex items-center gap-3 text-xs">
                                 <span className="inline-flex items-center gap-1 text-on-surface-variant">
                                   <span className="material-symbols-outlined text-sm text-amber-500">sunny</span>
-                                  14°C Crisp Sky
+                                  {activeClimate?.tempHighC ?? 24}°C {activeClimate?.condition ?? "Clear Sky"}
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-secondary font-semibold">
                                   <span className="material-symbols-outlined text-sm">check_circle</span>
-                                  KKH Status: PASSABLE
+                                  Corridor: {activeRouteMetrics?.roadPassabilityPercent ?? 98}% PASSABLE
                                 </span>
                               </div>
                             </div>
@@ -416,7 +476,7 @@ export default function TripsPage() {
                         <div className="relative w-full h-48 rounded-xl overflow-hidden shadow-xs border border-outline-variant/40 group">
                           <img
                             src="https://lh3.googleusercontent.com/aida-public/AB6AXuDE7jONMFJ6B9HEu3w3mMhMsFblNSzBEqfgC0A6-CvgO6XDcH2NzMPF_hbynDsypBtEHNRvT6IzrZlWWM7H04dFUxuc36_RNCPRUgxUj9hWCP9TSLmDEMLd9U20w0VXFPMOGpPHXeaFFpmmQDnyWjYdKAmpt8_GeI8tJgDyofhOCZjqktKmlzVMJRWB2sP_zg3iVVKKjC6Z7rbxhYQ7dlm5IfDJiKEM7NjpJQiWXxuBocWZonJ9jLT7sQ"
-                            alt="Karakoram Route"
+                            alt={activeTrip.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
@@ -434,7 +494,9 @@ export default function TripsPage() {
                         <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 flex flex-col gap-2">
                           <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">
                             <span>Elevation Profile</span>
-                            <span className="font-semibold text-on-surface">Max 2,900m</span>
+                            <span className="font-semibold text-on-surface">
+                              {activeOriginLoc?.elevation_m ?? 200}m → {activeDestLoc?.elevation_m ?? 500}m
+                            </span>
                           </div>
                           <svg className="w-full h-10 text-secondary" fill="none" preserveAspectRatio="none" viewBox="0 0 300 48">
                             <path d="M0,40 Q40,38 75,32 T150,22 T220,12 T300,16" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -443,9 +505,9 @@ export default function TripsPage() {
                             <circle cx="150" cy="22" fill="currentColor" r="3" />
                           </svg>
                           <div className="flex justify-between text-[10px] font-mono text-on-surface-variant">
-                            <span>Islamabad</span>
-                            <span className="text-secondary font-bold">Hunza Corridor</span>
-                            <span>Passu</span>
+                            <span>{activeOriginLoc?.name ?? "Origin"}</span>
+                            <span className="text-secondary font-bold">{activeDestLoc?.name ?? "Destination"} Corridor</span>
+                            <span>{activeDestLoc?.district ?? "District"}</span>
                           </div>
                         </div>
                       </div>
@@ -528,7 +590,7 @@ export default function TripsPage() {
                             <div>
                               <div className="font-mono text-[9px] text-on-surface-variant uppercase">Distance</div>
                               <div className="font-display text-xs font-bold text-on-surface">
-                                {Math.round(activeItin?.total_travel_distance_km || 0)} km
+                                {getTripDistance(trip)} km
                               </div>
                             </div>
                           </div>

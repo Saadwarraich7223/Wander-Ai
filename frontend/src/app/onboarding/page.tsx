@@ -94,7 +94,7 @@ const BUDGET_OPTIONS: BudgetOption[] = [
 ];
 
 interface StyleOption {
-  id: "heritage" | "alpine" | "slow" | "mixed";
+  id: "cultural" | "adventure" | "relaxation" | "mixed";
   icon: string;
   title: string;
   description: string;
@@ -103,21 +103,21 @@ interface StyleOption {
 
 const STYLE_OPTIONS: StyleOption[] = [
   {
-    id: "heritage",
+    id: "cultural",
     icon: "history_edu",
     title: "Cultural Heritage",
     description: "Deep history, architectural immersion, museum archives.",
     archetype: "Cultural Heritage Archivist",
   },
   {
-    id: "alpine",
+    id: "adventure",
     icon: "terrain",
     title: "Alpine Adventure",
     description: "High-altitude treks, technical terrain, off-road corridors.",
     archetype: "Alpine Cultural Voyager",
   },
   {
-    id: "slow",
+    id: "relaxation",
     icon: "self_improvement",
     title: "Slow & Relaxation",
     description: "Scenic wellness, lake retreats, panoramic balcony pacing.",
@@ -142,7 +142,8 @@ export default function OnboardingPage() {
     "adventure",
   ]);
   const [selectedBudget, setSelectedBudget] = useState<"value" | "balanced" | "luxury">("balanced");
-  const [selectedStyle, setSelectedStyle] = useState<"heritage" | "alpine" | "slow" | "mixed">("alpine");
+  const [selectedStyle, setSelectedStyle] = useState<"cultural" | "adventure" | "relaxation" | "mixed">("adventure");
+  const [categories, setCategories] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +152,18 @@ export default function OnboardingPage() {
   useEffect(() => {
     const loggedUser = authStorage.getUser();
     setUser(loggedUser);
+
+    async function loadCategories() {
+      try {
+        const catList = await placesApi.getCategories();
+        if (Array.isArray(catList)) {
+          setCategories(catList);
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+    loadCategories();
   }, []);
 
   // Metrics Calculations
@@ -179,10 +192,39 @@ export default function OnboardingPage() {
       // If authenticated, sync with FastAPI backend
       if (token) {
         try {
-          const preferencesPayload = selectedInterests.map((catId) => ({
-            category_id: catId,
-            preference_score: 0.85,
-          }));
+          // Map interest slugs to valid Category UUIDs
+          const preferencesPayload: { category_id: string; preference_score: number }[] = [];
+          
+          selectedInterests.forEach((interestId) => {
+            const matchedCat = categories.find((c) => {
+              const cSlug = (c.slug || "").toLowerCase();
+              const cName = (c.name || "").toLowerCase();
+              if (interestId === "historical") return cSlug.includes("landmark") || cSlug.includes("cultur") || cSlug.includes("herit") || cName.includes("heritage");
+              if (interestId === "nature") return cSlug.includes("nature") || cName.includes("nature");
+              if (interestId === "adventure") return cSlug.includes("advent") || cName.includes("adventure");
+              if (interestId === "food") return cSlug.includes("food") || cSlug.includes("din") || cName.includes("food");
+              if (interestId === "religious") return cSlug.includes("relig") || cName.includes("religious");
+              if (interestId === "shopping") return cSlug.includes("shop") || cSlug.includes("bazaar") || cName.includes("shopping");
+              return c.id === interestId || cSlug === interestId;
+            });
+
+            if (matchedCat && matchedCat.id) {
+              preferencesPayload.push({
+                category_id: matchedCat.id,
+                preference_score: 0.85,
+              });
+            }
+          });
+
+          // If no categories matched yet, use first few categories from database
+          if (preferencesPayload.length === 0 && categories.length > 0) {
+            categories.slice(0, 3).forEach((c) => {
+              preferencesPayload.push({
+                category_id: c.id,
+                preference_score: 0.85,
+              });
+            });
+          }
 
           if (preferencesPayload.length > 0) {
             await api.put("/users/me/preferences", { preferences: preferencesPayload });
@@ -200,6 +242,7 @@ export default function OnboardingPage() {
           console.warn("Could not sync remote profile", profErr);
         }
       }
+
 
       // Cache locally
       if (typeof window !== "undefined") {

@@ -142,10 +142,9 @@ class TravelToolService:
             p1 = places.get(place_ids[i])
             p2 = places.get(place_ids[i + 1])
             if p1 and p2:
-                optimizer = ItineraryOptimizerService(self.db)
-                dist, dur = optimizer.haversine_distance(
-                    p1.latitude, p1.longitude, p2.latitude, p2.longitude
-                )
+                from app.services.optimizer_service import haversine_distance_km, estimate_travel_time_minutes
+                dist = haversine_distance_km(p1.latitude, p1.longitude, p2.latitude, p2.longitude)
+                dur = estimate_travel_time_minutes(dist)
                 total_distance += dist
                 total_time += dur
 
@@ -160,17 +159,17 @@ class TravelToolService:
     ) -> List[Dict[str, Any]]:
         """Tool 6: Query platform recommendation engine."""
         rec_service = RecommendationService(self.db)
-        city_uuid = uuid.UUID(city_id) if city_id else None
         recs = await rec_service.get_recommendations(user=user, model_name=model, limit=5)
         return [
             {
                 "id": str(r.place.id),
                 "name": r.place.name,
                 "score": r.score,
-                "explanation": r.explanation,
+                "explanation": r.score_explanation,
             }
             for r in recs
         ]
+
 
     async def get_itinerary(self, trip_id: str) -> Optional[Dict[str, Any]]:
         """Tool 7: Retrieve active trip itinerary state."""

@@ -94,3 +94,21 @@
 .text-body-sm { font-size: 13px; line-height: 20px; letter-spacing: 0.005em; font-weight: 400; }
 .text-label-md { font-size: 12px; line-height: 16px; letter-spacing: 0.04em; font-weight: 600; }
 .text-label-sm { font-size: 11px; line-height: 14px; letter-spacing: 0.06em; font-weight: 500; }
+
+@media print {
+  header, nav, footer, button, .no-print, [role="dialog"] {
+    display: none !important;
+  }
+  body, main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
+    box-shadow: none !important;
+  }
+  .page-break {
+    page-break-after: always;
+  }
+}

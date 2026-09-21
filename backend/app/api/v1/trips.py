@@ -139,8 +139,9 @@ async def create_trip(
     prefs = dict(payload.context) if payload.context else {}
     prefs["pace"] = payload.pace
 
+    user_id = current_user.id
     trip = Trip(
-        user_id=current_user.id,
+        user_id=user_id,
         destination_city_id=payload.city_id,
         title=payload.title,
         total_days=payload.duration_days,
@@ -150,13 +151,15 @@ async def create_trip(
     )
     db.add(trip)
     await db.flush()
+    trip_id = trip.id
 
     # Generate Itinerary v1
     optimizer = ItineraryOptimizerService(db)
     await optimizer.build_and_save_itinerary(trip, current_user, version=1)
+    await db.commit()
 
-    # Refetch full trip with relationships
-    return await get_trip(trip.id, db, current_user)
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
 
 
 @router.get("", response_model=list[TripResponse])
@@ -195,28 +198,7 @@ async def get_trip(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get full details of a specific trip with active itinerary."""
-    query = (
-        select(Trip)
-        .options(
-            selectinload(Trip.itineraries)
-            .selectinload(Itinerary.days)
-            .selectinload(ItineraryDay.items)
-            .selectinload(ItineraryItem.place)
-            .selectinload(Place.category),
-            selectinload(Trip.itineraries)
-            .selectinload(Itinerary.days)
-            .selectinload(ItineraryDay.items)
-            .selectinload(ItineraryItem.place)
-            .selectinload(Place.images),
-        )
-        .filter(Trip.id == trip_id, Trip.user_id == current_user.id)
-    )
-    res = await db.execute(query)
-    trip = res.scalar_one_or_none()
-
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
-
+    trip = await _load_trip_with_itinerary(trip_id, current_user.id, db)
     return _format_trip_response(trip)
 
 
@@ -231,11 +213,8 @@ async def reoptimize_trip(
     Reoptimize an existing trip with updated parameters.
     Increments itinerary version (v1 -> v2) without deleting previous versions.
     """
-    res = await db.execute(select(Trip).filter(Trip.id == trip_id, Trip.user_id == current_user.id))
-    trip = res.scalar_one_or_none()
-
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
 
     if payload.new_total_budget is not None:
         trip.total_budget = payload.new_total_budget
@@ -245,6 +224,10 @@ async def reoptimize_trip(
         prefs = dict(trip.preferences or {})
         prefs["pace"] = payload.new_pace
         trip.preferences = prefs
+    if payload.new_preferences is not None:
+        prefs = dict(trip.preferences or {})
+        prefs.update(payload.new_preferences)
+        trip.preferences = prefs
 
     # Count existing versions
     v_res = await db.execute(select(Itinerary).filter(Itinerary.trip_id == trip.id))
@@ -253,8 +236,11 @@ async def reoptimize_trip(
 
     optimizer = ItineraryOptimizerService(db)
     await optimizer.build_and_save_itinerary(trip, current_user, version=new_version)
+    await db.commit()
+    db.expire_all()
 
-    return await get_trip(trip.id, db, current_user)
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
 
 
 @router.post("/{trip_id}/stops", response_model=TripResponse)
@@ -270,9 +256,14 @@ async def add_stop_to_trip(
     Uses the last day by default, or the preferred_day_number if provided.
     Time slots continue from the last scheduled item (09:00 if the day is empty).
     """
-    trip = await _load_trip_with_itinerary(trip_id, current_user.id, db)
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
 
-    place_res = await db.execute(select(Place).filter(Place.id == payload.place_id))
+    place_res = await db.execute(
+        select(Place)
+        .options(selectinload(Place.category), selectinload(Place.images))
+        .filter(Place.id == payload.place_id)
+    )
     place = place_res.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Place not found")
@@ -294,16 +285,22 @@ async def add_stop_to_trip(
     existing_items = sorted(target_day.items, key=lambda i: i.item_order)
     prev_end_minute = ItineraryOptimizerService.DAY_START_MINUTE
     if existing_items and existing_items[-1].end_time:
-        hh, mm = (int(x) for x in existing_items[-1].end_time.split(":"))
-        prev_end_minute = hh * 60 + mm
+        try:
+            time_str = str(existing_items[-1].end_time).strip().split()[0]
+            hh, mm = (int(x) for x in time_str.split(":"))
+            prev_end_minute = hh * 60 + mm + 15  # 15 min transit gap
+        except Exception:
+            prev_end_minute = ItineraryOptimizerService.DAY_START_MINUTE + len(existing_items) * 105
 
     start_minute = prev_end_minute
-    visit_duration = min(
-        place.average_visit_duration_minutes or 90,
-        ItineraryOptimizerService.DAY_END_MINUTE - start_minute,
-    )
-    if visit_duration <= 0:
-        raise HTTPException(status_code=400, detail="Target day is fully scheduled — pick another day")
+    if start_minute >= ItineraryOptimizerService.DAY_END_MINUTE:
+        start_minute = max(ItineraryOptimizerService.DAY_START_MINUTE, ItineraryOptimizerService.DAY_END_MINUTE - 75)
+        visit_duration = 60
+    else:
+        visit_duration = min(
+            place.average_visit_duration_minutes or 90,
+            max(45, ItineraryOptimizerService.DAY_END_MINUTE - start_minute),
+        )
 
     place_cost = place.estimated_cost_max or 500.0
     item = ItineraryItem(
@@ -316,6 +313,8 @@ async def add_stop_to_trip(
         estimated_cost=place_cost,
         notes=f"Added stop: {place.name}",
     )
+    item.place = place
+    item.day = target_day
     db.add(item)
 
     itinerary.total_cost = round(
@@ -323,8 +322,115 @@ async def add_stop_to_trip(
         2,
     )
     await db.commit()
+    db.expire_all()
 
-    return await get_trip(trip.id, db, current_user)
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
+
+
+@router.delete("/{trip_id}/stops/{item_id}", response_model=TripResponse)
+async def remove_stop_from_trip(
+    trip_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Remove a specific stop (ItineraryItem) from the trip's active itinerary.
+    Recalculates the day's item orders, start/end times, and the itinerary total cost.
+    """
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    itinerary = trip.active_itinerary
+    if not itinerary or not itinerary.days:
+        raise HTTPException(status_code=400, detail="Trip has no active itinerary")
+
+    target_item = None
+    target_day = None
+    for day in itinerary.days:
+        for it in day.items:
+            if it.id == item_id:
+                target_item = it
+                target_day = day
+                break
+        if target_item:
+            break
+
+    if not target_item or not target_day:
+        raise HTTPException(status_code=404, detail="Itinerary stop not found")
+
+    item_cost = target_item.estimated_cost or 0.0
+    await db.delete(target_item)
+
+    # Recalculate remaining items in the target day
+    remaining_items = [i for i in target_day.items if i.id != item_id]
+    remaining_items.sort(key=lambda i: i.item_order)
+
+    current_minute = ItineraryOptimizerService.DAY_START_MINUTE
+    for idx, it in enumerate(remaining_items):
+        it.item_order = idx
+        dur = it.visit_duration_minutes or 90
+        it.start_time = format_time(current_minute)
+        it.end_time = format_time(current_minute + dur)
+        current_minute += dur + 30  # 30 min transit allowance
+
+    target_day.items = remaining_items
+    itinerary.total_cost = max(0.0, round((itinerary.total_cost or 0.0) - item_cost, 2))
+    await db.commit()
+    db.expire_all()
+
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
+
+
+@router.delete("/{trip_id}/days/{day_number}", response_model=TripResponse)
+async def remove_day_from_trip(
+    trip_id: uuid.UUID,
+    day_number: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Remove an entire day (ItineraryDay) from the trip's active itinerary.
+    Deletes the day and all of its items.
+    Re-indexes remaining days (1, 2, 3, ...).
+    Decrements trip.total_days.
+    Recalculates itinerary total cost.
+    """
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    itinerary = trip.active_itinerary
+    if not itinerary or not itinerary.days:
+        raise HTTPException(status_code=400, detail="Trip has no active itinerary")
+
+    target_day = next((d for d in itinerary.days if d.day_number == day_number), None)
+    if not target_day:
+        raise HTTPException(status_code=404, detail=f"Day {day_number} not found in itinerary")
+
+    # Subtract cost of any items in this day
+    day_cost = sum(item.estimated_cost or 0.0 for item in target_day.items)
+    await db.delete(target_day)
+
+    # Re-index remaining days
+    remaining_days = [d for d in itinerary.days if d.day_number != day_number]
+    remaining_days.sort(key=lambda d: d.day_number)
+
+    for new_idx, d in enumerate(remaining_days, start=1):
+        d.day_number = new_idx
+
+    itinerary.days = remaining_days
+
+    # Update trip total_days
+    trip.total_days = max(1, len(remaining_days))
+    if trip.start_date:
+        trip.end_date = trip.start_date + timedelta(days=trip.total_days - 1)
+
+    itinerary.total_cost = max(0.0, round((itinerary.total_cost or 0.0) - day_cost, 2))
+    await db.commit()
+    db.expire_all()
+
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
 
 
 @router.delete("/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)

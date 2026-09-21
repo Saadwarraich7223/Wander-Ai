@@ -89,6 +89,7 @@ class ReoptimizeRequest(BaseModel):
     new_total_budget: float | None = Field(None, ge=1000.0)
     new_duration_days: int | None = Field(None, ge=1, le=14)
     new_pace: str | None = Field(None, pattern=r"^(relaxed|moderate|balanced|packed)$")
+    new_preferences: dict[str, Any] | None = None
 
 
 class AddStopRequest(BaseModel):

@@ -61,7 +61,7 @@ class RAGAssistantService:
     async def answer_query(
         self,
         message: str,
-        current_user: User,
+        current_user: Optional[User] = None,
         trip_id: Optional[str] = None,
         city_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -96,13 +96,13 @@ class RAGAssistantService:
             recs = await self.tool_service.get_recommendations(current_user, city_id=city_id, model="model_e")
             rec_names = [r["name"] for r in recs[:3]]
             response = (
-                f"Based on your profile preferences and context-aware scoring, I recommend visiting: "
-                f"**{', '.join(rec_names)}**. These destinations match your interests and budget requirements."
+                f"Based on real-time weather and context-aware scoring, I recommend visiting: "
+                f"**{', '.join(rec_names)}**. These destinations offer optimal conditions and curated attractions."
             )
-            suggested_actions.append({"label": "View Recommendations", "action": "navigate", "payload": "/dashboard"})
+            suggested_actions.append({"label": "View Recommendations", "action": "navigate", "payload": "/recommendations"})
 
         elif "budget" in msg_lower or "reoptimize" in msg_lower or "cheaper" in msg_lower:
-            if trip_id:
+            if trip_id and current_user:
                 res = await self.tool_service.optimize_budget(trip_id, 25000.0, current_user)
                 response = (
                     f"I have executed the budget optimization tool for your trip. "
@@ -112,8 +112,9 @@ class RAGAssistantService:
                 suggested_actions.append({"label": "View Itinerary Timeline", "action": "navigate", "payload": f"/trips/{trip_id}"})
             else:
                 response = (
-                    "To optimize a trip budget, please select an existing trip or specify your desired target budget."
+                    "To optimize a trip budget, please open your trip in the Itinerary Planner and adjust your target budget."
                 )
+
 
         elif "weather" in msg_lower or "rain" in msg_lower:
             weather_data = await self.tool_service.get_weather("Lahore")

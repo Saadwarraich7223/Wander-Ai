@@ -1,116 +1,74 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { placesApi, tripsApi, getErrorMessage } from "@/lib/api";
-import { City } from "@/types";
+import { placesApi, tripsApi } from "@/lib/api";
+import { City, PlaceSummary } from "@/types";
 import Navbar from "@/components/Navbar";
+import CityAutocomplete from "@/components/CityAutocomplete";
+import {
+  PakistanLocation,
+  findPakistanLocation,
+  calculateRouteMetrics,
+  getDestinationClimate,
+  getDestinationInterests,
+  PAKISTAN_LOCATIONS,
+} from "@/lib/pakistanGeo";
 
-interface DestinationPreset {
-  name: string;
-  region: string;
-  elevation: string;
-  image: string;
-  mapImage: string;
-  weather: string;
-  weatherTemp: string;
-  foliage: string;
-  waypoints: { title: string; type: string; desc: string; km?: string }[];
-}
+const POPULAR_ORIGIN_HUBS = [
+  { label: "Islamabad (ISB Hub)", val: "Islamabad (Islamabad Capital)" },
+  { label: "Lahore (LHE Hub)", val: "Lahore (Punjab)" },
+  { label: "Karachi (KHI Hub)", val: "Karachi (Sindh)" },
+  { label: "Peshawar (PEW Hub)", val: "Peshawar (Khyber Pakhtunkhwa)" },
+  { label: "Multan (MUX Hub)", val: "Multan (Punjab)" },
+  { label: "Bahawalpur (BWP Hub)", val: "Bahawalpur & Cholistan, Punjab" },
+  { label: "Chishtian (CTN)", val: "Chishtian (Punjab)" },
+];
 
-const DESTINATION_PRESETS: Record<string, DestinationPreset> = {
-  hunza: {
-    name: "Hunza Valley & Passu Cones",
-    region: "Gilgit-Baltistan",
-    elevation: "2,438m",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuA6kGwiJoU2OhGsixgvXfGqlWy-DjQMgj2XX2ffdT2P07Yhjv5ztVuPHdm1PlDs9v7MbfUgG34ClS3JGefPsjBpB0-6U90MvIG7bnfTigynCfQWEHfPSVt1HBi_PfQnPcP16z8c14rH-w0DjLr7EGZjp2DwylowOQM71ggT3qAf_MrhpGK-wu3O9fjATMToRu5p1EKzNH73RUDSzSb_mniq7Y9AJcP2Uq9PkV7q_dkNZa4ylIKsxpXLfw",
-    mapImage: "https://lh3.googleusercontent.com/aida-public/AB6AXuAIdYoEUaeCK29PBdSsLCpapQ0r93gcUs0rSqiBgNZFxRCbRRGrhQMAsXMmg8bg6_TBz5OVYdmX2kahZ8-c5-uoXFXFKYdaMbGfMH3IT-tdP3P8PTP65LFWS7xLgcG8I5iRYOOoM1VuARFIPY75QRXN4UAtrXqN7Li4m0-51ieDDjObvu4LEZLZCCRkYcDMk6VmSMlO7PTZ9m1iF8ppRmzrqVg8UNk0gGfjKPlpIsOG0XiDocBN78QxjA",
-    weather: "Clear Skies",
-    weatherTemp: "14°C",
-    foliage: "Foliage Peak: +4 Days",
-    waypoints: [
-      { title: "Day 1: Islamabad ➔ Chilas / Gilgit", type: "380 km", desc: "Karakoram Highway crossing, Babusar Pass staging checkpoint." },
-      { title: "Day 2-3: Karimabad, Baltit & Altit Forts", type: "Focal Hub", desc: "Royal terraced orchards, sunset photography at Eagle's Nest viewpoint." },
-      { title: "Day 4: Attabad Lake & Passu Cathedral Cones", type: "85 km", desc: "Turquoise boat crossing, Hussaini bridge hike, Borith glacier tea." },
-      { title: "Day 5: Souvenirs, Walnut Delights & Descent", type: "Return", desc: "Gilgit dry fruit bazaar, flight / transit connect to Islamabad hub." },
-    ],
+const QUICK_TEMPLATES = [
+  {
+    label: "🍂 Hunza Autumn Peak (5D)",
+    fit: "98% Fit",
+    destName: "Hunza Valley & Gojal, Gilgit-Baltistan",
+    days: 5,
+    budget: 55000,
   },
-  skardu: {
-    name: "Skardu Glacial Lakes & Deosai Plains",
-    region: "Baltistan",
-    elevation: "2,228m",
-    image: "https://images.unsplash.com/photo-1627894098906-74045f29910d?q=80&w=1200&auto=format&fit=crop",
-    mapImage: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=1000&auto=format&fit=crop",
-    weather: "Sunny High Altitude",
-    weatherTemp: "11°C",
-    foliage: "Alpine Peak: Active",
-    waypoints: [
-      { title: "Day 1: Skardu Arrival & Lower Kachura", type: "Arrival", desc: "Check-in at Shangrila resort, boat ride at Shangrila lake." },
-      { title: "Day 2: Upper Kachura & Cold Desert", type: "45 km", desc: "Desert dunes safari in Katpana, sunset stargazing." },
-      { title: "Day 3: Deosai National Park & Sheosar Lake", type: "High Plateau", desc: "High altitude plateau, brown bear sanctuary, floral plains." },
-      { title: "Day 4: Shigar Fort & Organic Orchards", type: "Heritage", desc: "17th century heritage palace, organic fruit gardens." },
-      { title: "Day 5-7: Khaplu Palace & Ascent", type: "Trek", desc: "Sailing valley trek, handcrafted gemstone bazaar shopping." },
-    ],
+  {
+    label: "❄️ Skardu Glacial Trek (7D)",
+    fit: "95% Fit",
+    destName: "Skardu & Deosai Plains, Gilgit-Baltistan",
+    days: 7,
+    budget: 85000,
   },
-  swat: {
-    name: "Swat Emerald Valleys & Kalam",
-    region: "Khyber Pakhtunkhwa",
-    elevation: "1,980m",
-    image: "https://images.unsplash.com/photo-1596895111956-bf1cf0599ce5?q=80&w=1200&auto=format&fit=crop",
-    mapImage: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1000&auto=format&fit=crop",
-    weather: "Mild Breeze",
-    weatherTemp: "18°C",
-    foliage: "Pine Canopy Clear",
-    waypoints: [
-      { title: "Day 1: Islamabad ➔ Mingora & Fizagat", type: "Transit", desc: "Swat Motorway scenic transit, riverfront dinner." },
-      { title: "Day 2: White Palace & Malam Jabba", type: "Alpine", desc: "Marble palace architecture, chairlift ride & alpine forest." },
-      { title: "Day 3: Kalam Valley & Ushu Forest", type: "Glacier", desc: "Dense pine canopy, glacier streams, trout farm lunch." },
-      { title: "Day 4: Mahodand Lake Expedition", type: "Offroad 4x4", desc: "Jeep track to high alpine lake, horseback riding." },
-    ],
+  {
+    label: "🏰 Bahawalpur & Cholistan Forts (3D)",
+    fit: "99% Fit",
+    destName: "Bahawalpur & Cholistan, Punjab",
+    days: 3,
+    budget: 35000,
   },
-  lahore: {
-    name: "Lahore Walled City & Mughal Heritage",
-    region: "Punjab",
-    elevation: "217m",
-    image: "https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=1200&auto=format&fit=crop",
-    mapImage: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1000&auto=format&fit=crop",
-    weather: "Warm & Vibrant",
-    weatherTemp: "26°C",
-    foliage: "Culinary Season",
-    waypoints: [
-      { title: "Day 1: Walled City & Badshahi Mosque", type: "Mughal", desc: "Mughal grandeur, Delhi Gate heritage walk, Haveli dinner." },
-      { title: "Day 2: Lahore Fort & Shalamar Gardens", type: "UNESCO", desc: "Sheesh Mahal mirror palace, royal fountains." },
-      { title: "Day 3: Anarkali Bazaar & Qawwali Night", type: "Culinary", desc: "Colonial art collections, traditional silk & spice bazaars." },
-    ],
+  {
+    label: "🕌 Lahore Heritage Trail (3D)",
+    fit: "96% Fit",
+    destName: "Lahore, Punjab",
+    days: 3,
+    budget: 32000,
   },
-  gwadar: {
-    name: "Makran Coastal Highway & Gwadar",
-    region: "Balochistan",
-    elevation: "12m",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format&fit=crop",
-    mapImage: "https://images.unsplash.com/photo-1519046904884-53103b34b206?q=80&w=1000&auto=format&fit=crop",
-    weather: "Coastal Breeze",
-    weatherTemp: "28°C",
-    foliage: "Oceanic Sunset",
-    waypoints: [
-      { title: "Day 1: Karachi ➔ Kund Malir & Hingol", type: "Highway", desc: "Princess of Hope rock formations, Sphinx of Balochistan." },
-      { title: "Day 2: Ormara Beach & Turtle Beaches", type: "Coastal", desc: "Pristine white sand beaches, bioluminescent waters." },
-      { title: "Day 3: Gwadar Port & Sunset at Koh-e-Batil", type: "Port View", desc: "Hammerhead peninsula overlook, seafood feast." },
-      { title: "Day 4: Jiwani & Marine Reserve", type: "Return", desc: "Victoria Hut sunset point, mangrove ecosystem." },
-    ],
+  {
+    label: "🌊 Makran Coastal Run (4D)",
+    fit: "94% Fit",
+    destName: "Gwadar & Makran Coast, Balochistan",
+    days: 4,
+    budget: 48000,
   },
-};
-
-const INTEREST_OPTIONS = [
-  { id: "nature", label: "🏔️ Nature & Peaks" },
-  { id: "photography", label: "📸 Haute Photography" },
-  { id: "trekking", label: "🧗 Alpine Trekking" },
-  { id: "food", label: "🍲 Gastronomic Trails" },
-  { id: "heritage", label: "🕌 Heritage & Mughal History" },
-  { id: "stargazing", label: "🌌 High-Altitude Stargazing" },
-  { id: "glamping", label: "🏕️ Stays & Glamping" },
-  { id: "bazaar", label: "🛍️ Silk Road Bazaars" },
+  {
+    label: "🌲 Swat & Kalam Valleys (4D)",
+    fit: "97% Fit",
+    destName: "Swat & Kalam Emerald Valleys, Khyber Pakhtunkhwa",
+    days: 4,
+    budget: 42000,
+  },
 ];
 
 function PlannerContent() {
@@ -127,16 +85,51 @@ function PlannerContent() {
   } | null>(null);
 
   // Form State
-  const [originCity, setOriginCity] = useState<string>("Islamabad / Rawalpindi (ISB Hub)");
+  const [originCity, setOriginCity] = useState<string>("Islamabad (Islamabad Capital)");
+  const [originLocation, setOriginLocation] = useState<PakistanLocation | null>(() =>
+    findPakistanLocation("Islamabad") || PAKISTAN_LOCATIONS[0]
+  );
+
   const [destination, setDestination] = useState<string>("Hunza Valley & Gojal, Gilgit-Baltistan");
+  const [destinationLocation, setDestinationLocation] = useState<PakistanLocation | null>(() =>
+    findPakistanLocation("Hunza") || PAKISTAN_LOCATIONS[0]
+  );
+
+  const [destinationPlaces, setDestinationPlaces] = useState<PlaceSummary[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date();
-    return today.toISOString().split("T")[0]; // Default to today
+    return today.toISOString().split("T")[0];
   });
   const [daysCount, setDaysCount] = useState<number>(5);
   const [currency, setCurrency] = useState<"PKR" | "USD">("PKR");
   const [budget, setBudget] = useState<number>(50000);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>(["nature", "photography", "trekking", "food"]);
+
+  // Dynamic Contextual Destination Interests Matrix
+  const destinationMatrix = useMemo(() => {
+    const defaultDest = findPakistanLocation("Hunza")!;
+    return getDestinationInterests(destinationLocation || defaultDest);
+  }, [destinationLocation]);
+
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(() => {
+    const defaultDest = findPakistanLocation("Hunza")!;
+    return getDestinationInterests(defaultDest).defaultSelectedIds;
+  });
+
+  const prevDestKeyRef = useRef<string>("");
+
+  // Automatically update selected interests whenever destination location or category changes
+  useEffect(() => {
+    const currentKey = destinationLocation
+      ? `${destinationLocation.id}-${destinationMatrix.category}`
+      : `default-${destinationMatrix.category}`;
+    if (currentKey !== prevDestKeyRef.current) {
+      prevDestKeyRef.current = currentKey;
+      setSelectedInterests(destinationMatrix.defaultSelectedIds);
+    }
+  }, [destinationLocation, destinationMatrix]);
+
   const [travelStyle, setTravelStyle] = useState<"solo" | "couple" | "family" | "crew">("solo");
   const [transitMode, setTransitMode] = useState<"car" | "flight" | "bus" | "hybrid">("car");
   const [lodgingStyle, setLodgingStyle] = useState<"glamping" | "midrange" | "homestay">("glamping");
@@ -147,13 +140,13 @@ function PlannerContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activePreset, setActivePreset] = useState<DestinationPreset>(DESTINATION_PRESETS.hunza);
 
   useEffect(() => {
     fetchBackendCities();
     fetchTripsCount();
   }, []);
 
+  // Handle incoming query params
   useEffect(() => {
     const pId = searchParams.get("place_id");
     const pName = searchParams.get("place_name");
@@ -170,7 +163,10 @@ function PlannerContent() {
         city_name: cName || undefined,
       });
 
-      setDestination(cName ? `${pName}, ${cName}` : pName);
+      const destString = cName ? `${pName}, ${cName}` : pName;
+      setDestination(destString);
+      const loc = findPakistanLocation(cName || pName);
+      if (loc) setDestinationLocation(loc);
     }
 
     if (daysParam) {
@@ -185,25 +181,118 @@ function PlannerContent() {
     }
   }, [searchParams]);
 
+  // Sync destination location when destination text changes
   useEffect(() => {
-    const text = destination.toLowerCase();
-    if (text.includes("skardu")) {
-      setActivePreset(DESTINATION_PRESETS.skardu);
-    } else if (text.includes("swat")) {
-      setActivePreset(DESTINATION_PRESETS.swat);
-    } else if (text.includes("lahore")) {
-      setActivePreset(DESTINATION_PRESETS.lahore);
-    } else if (text.includes("gwadar") || text.includes("makran") || text.includes("balochistan")) {
-      setActivePreset(DESTINATION_PRESETS.gwadar);
-    } else {
-      setActivePreset(DESTINATION_PRESETS.hunza);
+    const loc = findPakistanLocation(destination);
+    if (loc) {
+      setDestinationLocation(loc);
     }
   }, [destination]);
 
-  // Dynamic End Date & Seasonality Gate calculation
-  const startObj = new Date(startDate || "2025-10-18");
-  const endObj = new Date(startObj);
-  endObj.setDate(startObj.getDate() + Math.max(1, daysCount - 1));
+  // Sync origin location when origin text changes
+  useEffect(() => {
+    const loc = findPakistanLocation(originCity);
+    if (loc) {
+      setOriginLocation(loc);
+    }
+  }, [originCity]);
+
+  // Dynamic Route Metrics (PostGIS Haversine + Terrain Routing)
+  const routeMetrics = useMemo(() => {
+    const defaultOrigin = findPakistanLocation("Islamabad")!;
+    const defaultDest = findPakistanLocation("Hunza")!;
+    return calculateRouteMetrics(
+      originLocation || defaultOrigin,
+      destinationLocation || defaultDest
+    );
+  }, [originLocation, destinationLocation]);
+
+  // If flight is not viable for this route, ensure transitMode is not left on flight
+  useEffect(() => {
+    if (!routeMetrics.canFlyCommercial && transitMode === "flight") {
+      setTransitMode("car");
+    }
+  }, [routeMetrics.canFlyCommercial, transitMode]);
+
+  // Fetch real database places for the active destination
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadPlacesForDestination() {
+      if (!destinationLocation) return;
+      setIsLoadingPlaces(true);
+
+      try {
+        // 1. Only look up database places if this location is an exact database city
+        // (Do NOT use parent_hub_slug because it will pull Lahore's places for Kasur, or Bahawalpur's places for Hasilpur!)
+        const matchedCity = destinationLocation.db_city_slug
+          ? cities.find((c) => c.slug === destinationLocation.db_city_slug)
+          : cities.find(
+              (c) =>
+                c.name.toLowerCase() === destinationLocation.name.toLowerCase() ||
+                c.slug.toLowerCase() === destinationLocation.name.toLowerCase()
+            );
+
+        if (matchedCity) {
+          const res = await placesApi.list({ city_id: matchedCity.id, limit: 15 });
+          if (!isCancelled && res?.items && res.items.length > 0) {
+            setDestinationPlaces(res.items);
+            setIsLoadingPlaces(false);
+            return;
+          }
+        }
+
+        // 2. If no direct DB city match, try searching database for places that explicitly match this exact city/town name
+        const searchWord = destinationLocation.name.split(" ")[0].replace(/[^a-zA-Z]/g, "");
+        if (searchWord.length >= 3) {
+          const res = await placesApi.list({ q: searchWord, limit: 10 });
+          if (!isCancelled && res?.items && res.items.length > 0) {
+            const validMatches = res.items.filter((item: PlaceSummary) => {
+              const matchName = item.name.toLowerCase().includes(searchWord.toLowerCase());
+              const matchDesc = item.description?.toLowerCase().includes(searchWord.toLowerCase());
+              return matchName || matchDesc;
+            });
+            if (validMatches.length > 0) {
+              setDestinationPlaces(validMatches);
+              setIsLoadingPlaces(false);
+              return;
+            }
+          }
+        }
+
+        // 3. Fallback to empty [] so that the pipeline strictly uses destinationLocation's curated highlights
+        if (!isCancelled) {
+          setDestinationPlaces([]);
+          setIsLoadingPlaces(false);
+        }
+      } catch {
+        if (!isCancelled) {
+          setDestinationPlaces([]);
+          setIsLoadingPlaces(false);
+        }
+      }
+    }
+
+    loadPlacesForDestination();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [destinationLocation, cities]);
+
+  // Dynamic Climate & Seasonality Metrics
+  const climateMetrics = useMemo(() => {
+    const defaultDest = findPakistanLocation("Hunza")!;
+    return getDestinationClimate(destinationLocation || defaultDest, startDate);
+  }, [destinationLocation, startDate]);
+
+  // Dynamic Dates
+  const startObj = useMemo(() => new Date(startDate || "2025-10-18"), [startDate]);
+  const endObj = useMemo(() => {
+    const d = new Date(startObj);
+    d.setDate(startObj.getDate() + Math.max(1, daysCount - 1));
+    return d;
+  }, [startObj, daysCount]);
 
   const formatShortDate = (d: Date) =>
     d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -211,78 +300,377 @@ function PlannerContent() {
   const endDateFormatted = formatShortDate(endObj);
   const startDateFormatted = formatShortDate(startObj);
 
-  // Month-based seasonality gate tag
-  const monthNum = startObj.getMonth() + 1;
-  const seasonalityGate =
-    monthNum >= 10 && monthNum <= 11
-      ? "🍁 Golden Autumn Peak"
-      : monthNum >= 5 && monthNum <= 9
-      ? "🌿 Green Alpine Peak"
-      : "❄️ High Altitude Snow Gate";
+  // Dynamic Waypoint Pipeline Builder (Filtered & Ranked by Selected Taste & Experience Matrix Themes)
+  const synthesizedWaypoints = useMemo(() => {
+    const destLoc = destinationLocation || findPakistanLocation("Hunza")!;
+    const originLoc = originLocation || findPakistanLocation("Islamabad")!;
+    const isSameCity = routeMetrics.drivingDistanceKm < 20;
 
-  // Dynamic distance & mode telemetry based on BOTH origin and destination
-  const getRouteTelemetry = () => {
-    const o = originCity.toLowerCase();
-    const d = destination.toLowerCase();
+    const waypoints: { title: string; type: string; desc: string }[] = [];
 
-    // 1. Same city / Intra-city staycation or local tour
-    const originBasename = o.split(" ")[0].replace(/[^a-z]/g, "");
+    // Day 1: Transit & Check-in / Anchor
+    if (isSameCity) {
+      waypoints.push({
+        title: `Day 1: ${destLoc.name} Intra-City Staging & Heritage Circuit`,
+        type: "Local Transit",
+        desc: `Local exploration and arrival check-in. Curated boutique lodging in central ${destLoc.name}.`,
+      });
+    } else {
+      waypoints.push({
+        title: `Day 1: ${originLoc.name.split(" ")[0]} ➔ ${destLoc.name.split(" ")[0]}`,
+        type: `${routeMetrics.drivingDistanceKm} km`,
+        desc: `Transit via ${routeMetrics.corridorName}. Arrival & panoramic orientation dinner in ${destLoc.name}.`,
+      });
+    }
+
+    // Keyword & Semantic Matcher for Taste & Experience Matrix Themes
+    const scoreCandidate = (
+      title: string,
+      desc: string
+    ): { score: number; matchedType: string } => {
+      const text = `${title} ${desc}`.toLowerCase();
+      let score = 0;
+      let matchedType = "Curated Excursion";
+
+      const themeRules: Record<string, { keywords: string[]; type: string; weight: number }> = {
+        wetlands_wildlife: {
+          keywords: ["wetland", "wildlife", "national park", "sanctuary", "deer", "blackbuck", "lake", "canal", "river", "barrage", "forest", "lal suhanra", "head islam"],
+          type: "Nature & Wildlife Sanctuary",
+          weight: 15,
+        },
+        artisan_crafts: {
+          keywords: ["bazaar", "craft", "chunri", "pottery", "artisan", "handicraft", "leather", "market", "silk", "shopping"],
+          type: "Handcrafted Bazaars & Culture",
+          weight: 15,
+        },
+        craft_bazaars: {
+          keywords: ["bazaar", "craft", "market", "anarkali", "walled city", "silk", "shopping"],
+          type: "Artisan Bazaars & Silk Markets",
+          weight: 15,
+        },
+        local_shawls: {
+          keywords: ["shawl", "pashmina", "bazaar", "craft", "market", "handicraft"],
+          type: "Handcrafted Shawls & Bazaars",
+          weight: 15,
+        },
+        tribal_bazaars: {
+          keywords: ["mirrorwork", "rug", "tribal", "bazaar", "craft", "market"],
+          type: "Baloch Tribal Crafts & Bazaars",
+          weight: 15,
+        },
+        gemstone_bazaars: {
+          keywords: ["gemstone", "patti", "handcraft", "bazaar", "market"],
+          type: "Mountain Gemstones & Crafts",
+          weight: 15,
+        },
+        port_bazaars: {
+          keywords: ["port", "bazaar", "market", "embroidery", "craft"],
+          type: "Silk Route Port Bazaars",
+          weight: 15,
+        },
+        sufi_heritage: {
+          keywords: ["shrine", "sufi", "hakra", "channan pir", "ruins", "civilization", "ancient", "tomb", "maharvi", "bulleh shah"],
+          type: "Ancient Civilization & Sufi Heritage",
+          weight: 15,
+        },
+        royal_forts: {
+          keywords: ["palace", "mahal", "fort", "fortress", "bastion", "citadel", "noor mahal", "darbar mahal"],
+          type: "Royal Palaces & Fortresses",
+          weight: 12,
+        },
+        desert_safari: {
+          keywords: ["desert", "dune", "safari", "4x4", "cholistan", "thar", "sand", "derawar"],
+          type: "4x4 Desert Dunes Safari",
+          weight: 12,
+        },
+        mughal_heritage: {
+          keywords: ["mughal", "badshahi", "unesco", "sheesh mahal", "shalamar", "monument", "historic", "heritage"],
+          type: "Mughal Architecture & Heritage",
+          weight: 12,
+        },
+        historic_passes: {
+          keywords: ["pass", "bolan", "silk", "fort", "historic"],
+          type: "Historic Passes & Silk Forts",
+          weight: 12,
+        },
+        museums_archaeology: {
+          keywords: ["museum", "archaeological", "relic", "gandhara", "taxila", "harappa"],
+          type: "Archaeological Museums & Relics",
+          weight: 12,
+        },
+        gastronomy: {
+          keywords: ["gastronomy", "cuisine", "sohan halwa", "sajji", "food", "fare", "dining", "delicacy"],
+          type: "Saraiki & Royal Gastronomy",
+          weight: 12,
+        },
+        food_street: {
+          keywords: ["food street", "gastronomy", "dining", "karahi", "namak mandi", "gawalmandi"],
+          type: "Legendary Food Streets & Gastronomy",
+          weight: 12,
+        },
+        trout_gastronomy: {
+          keywords: ["trout", "river trout", "fish", "cafe", "food", "dining"],
+          type: "Fresh River Trout & Mountain Cafes",
+          weight: 12,
+        },
+        seafood_gastronomy: {
+          keywords: ["seafood", "fish", "harbor", "dining", "crabs", "prawns"],
+          type: "Fresh Harbor Seafood Dining",
+          weight: 12,
+        },
+        balochi_gastronomy: {
+          keywords: ["balochi", "rosh", "sajji", "kakar", "bread", "dining"],
+          type: "Balochi Rosh & Traditional Gastronomy",
+          weight: 12,
+        },
+        silk_road_food: {
+          keywords: ["apricot", "walnut", "fare", "indigenous", "food"],
+          type: "Silk Road Indigenous Fare",
+          weight: 12,
+        },
+        stargazing_glamping: {
+          keywords: ["glamping", "stargazing", "star", "camp", "night", "dunes camp"],
+          type: "Desert Glamping & Stargazing",
+          weight: 12,
+        },
+        stargazing: {
+          keywords: ["stargazing", "milky way", "star", "night", "astronomy", "dark sky"],
+          type: "High-Altitude Milky Way Stargazing",
+          weight: 12,
+        },
+        glamping_chalets: {
+          keywords: ["chalet", "glamping", "cabin", "wooden", "stay"],
+          type: "Boutique Wooden Chalets & Glamping",
+          weight: 12,
+        },
+        glamping_cabins: {
+          keywords: ["cabin", "glamping", "forest stay", "riverside"],
+          type: "Riverside Cabins & Forest Glamping",
+          weight: 12,
+        },
+        beach_camping: {
+          keywords: ["beach", "camping", "glamping", "bioluminescence"],
+          type: "Coastal Glamping & Bioluminescence",
+          weight: 12,
+        },
+        highland_camping: {
+          keywords: ["plateau", "camping", "highland", "star"],
+          type: "High Plateau Stargazing & Camping",
+          weight: 12,
+        },
+        nature_peaks: {
+          keywords: ["peak", "7,000m", "summit", "rakaposhi", "k2", "mountain", "viewpoint"],
+          type: "7,000m+ Summit Viewpoints",
+          weight: 12,
+        },
+        nature_canopy: {
+          keywords: ["pine", "canopy", "forest", "river", "stream", "nature"],
+          type: "Dense Pine Canopy & River Streams",
+          weight: 12,
+        },
+        juniper_forests: {
+          keywords: ["juniper", "forest", "reserve", "ancient", "tree"],
+          type: "Ancient Juniper World Reserves",
+          weight: 12,
+        },
+        coastal_beaches: {
+          keywords: ["beach", "cliff", "sea", "ocean", "arabian sea", "coast"],
+          type: "Arabian Sea Beaches & Cliffs",
+          weight: 12,
+        },
+        glacial_lakes: {
+          keywords: ["glacial lake", "attabad", "shangrila", "lake", "turquoise", "boating"],
+          type: "Turquoise Glacial Lakes & Boating",
+          weight: 12,
+        },
+        alpine_trekking: {
+          keywords: ["alpine", "trek", "glacier", "pass", "passu", "trail"],
+          type: "Alpine Trails & Glacier Passes",
+          weight: 12,
+        },
+        nature_hikes: {
+          keywords: ["nature trail", "waterfall", "hike", "walk", "meadow"],
+          type: "Gentle Nature Trails & Waterfalls",
+          weight: 12,
+        },
+        scenic_ridges: {
+          keywords: ["chairlift", "cable car", "ridge", "panoramic"],
+          type: "Chairlifts & Panoramic Ridge Walks",
+          weight: 12,
+        },
+        canyon_gorges: {
+          keywords: ["canyon", "gorge", "stream", "moola chotok", "scramble"],
+          type: "Hidden Canyon Gorges & Streams",
+          weight: 12,
+        },
+        photography: {
+          keywords: ["photography", "sunset", "vantage", "vantage point", "photo", "golden hour"],
+          type: "Haute Sunset & Landscape Photography",
+          weight: 8,
+        },
+      };
+
+      selectedInterests.forEach((interestId) => {
+        const rule = themeRules[interestId];
+        if (rule) {
+          for (const kw of rule.keywords) {
+            if (text.includes(kw)) {
+              score += rule.weight;
+              matchedType = rule.type;
+              break;
+            }
+          }
+        }
+      });
+
+      return { score, matchedType };
+    };
+
+    // 1. Gather all candidate places (combining curated highlights and database places)
+    interface CandidateItem {
+      title: string;
+      desc: string;
+      defaultType: string;
+      dedupKey: string;
+    }
+
+    const candidates: CandidateItem[] = [];
+    const seenKeys = new Set<string>();
+
+    const getDedupKey = (name: string) => {
+      return name
+        .toLowerCase()
+        .replace(/\(.*?\)/g, "")
+        .replace(/[^a-z0-9]/g, "")
+        .slice(0, 12);
+    };
+
+    // Add curated highlights first (they are perfectly tuned to the specific city/tehsil)
+    if (destLoc.curated_highlights && destLoc.curated_highlights.length > 0) {
+      destLoc.curated_highlights.forEach((h) => {
+        const key = getDedupKey(h);
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          candidates.push({
+            title: h,
+            desc: `Scenic field itinerary, photography vantage points, and authentic local cultural experience in ${destLoc.name}.`,
+            defaultType: "Curated Excursion",
+            dedupKey: key,
+          });
+        }
+      });
+    }
+
+    // Add database places (if direct matches exist)
+    if (destinationPlaces.length > 0) {
+      destinationPlaces.forEach((p) => {
+        const key = getDedupKey(p.name);
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          candidates.push({
+            title: p.name,
+            desc: p.description || `${p.name} exploration, photography vectors, and guided cultural experience.`,
+            defaultType: p.category?.name || "Focal Attraction",
+            dedupKey: key,
+          });
+        }
+      });
+    }
+
+    // Fallback if no specific candidates exist
+    if (candidates.length === 0) {
+      const region = destLoc.province;
+      candidates.push(
+        {
+          title: `${destLoc.name} Cultural Landmark & Heritage Circuit`,
+          desc: `Historic architecture, monuments, and iconic city landmarks in ${destLoc.name}.`,
+          defaultType: "Regional Heritage",
+          dedupKey: "fallback-heritage",
+        },
+        {
+          title: `Local Artisan Bazaars & Countryside Trails`,
+          desc: `Handcrafted artisan stalls, traditional markets, and regional delicacies.`,
+          defaultType: "Local Culture",
+          dedupKey: "fallback-bazaar",
+        },
+        {
+          title: `Panoramic Nature Vantage & Sunset Trail`,
+          desc: `Scenic outdoor viewpoints, golden hour photography, and local trails in ${destLoc.name}.`,
+          defaultType: "Nature & Scenery",
+          dedupKey: "fallback-nature",
+        }
+      );
+    }
+
+    // 2. Score and sort candidates by relevance to selectedInterests
+    const scoredCandidates = candidates.map((cand) => {
+      const { score, matchedType } = scoreCandidate(cand.title, cand.desc);
+      return {
+        ...cand,
+        score,
+        type: score > 0 ? matchedType : cand.defaultType,
+      };
+    });
+
+    // Sort: highest interest score first, maintaining stable order for ties
+    scoredCandidates.sort((a, b) => b.score - a.score);
+
+    // 3. Assign to Days 2..daysCount
+    const maxAttractionDays = Math.max(1, daysCount - 1);
+    const assignedItems = scoredCandidates.slice(0, maxAttractionDays);
+
+    assignedItems.forEach((item, idx) => {
+      const dayNumber = idx + 2;
+      if (dayNumber > daysCount) return;
+      waypoints.push({
+        title: `Day ${dayNumber}: ${item.title}`,
+        type: item.type,
+        desc: item.desc,
+      });
+    });
+
+    // Final Return Day if trip is multi-day and last day is transit
+    if (daysCount >= 3 && waypoints.length < daysCount) {
+      waypoints.push({
+        title: `Day ${daysCount}: Local Fare, Souvenirs & Return Vector`,
+        type: "Return Transit",
+        desc: `Morning artisan bazaar stroll, local specialties / dry fruits, and safe return journey to ${originLoc.name.split(" ")[0]}.`,
+      });
+    }
+
+    return waypoints.slice(0, daysCount);
+  }, [destinationLocation, originLocation, routeMetrics, destinationPlaces, daysCount, selectedInterests]);
+
+  // Destination Hero Image resolution
+  const heroImage = useMemo(() => {
+    if (destinationPlaces.length > 0 && destinationPlaces[0].primary_image?.url) {
+      return destinationPlaces[0].primary_image.url;
+    }
+    const destLoc = destinationLocation;
+    if (destLoc?.province === "Gilgit-Baltistan") {
+      return "https://lh3.googleusercontent.com/aida-public/AB6AXuA6kGwiJoU2OhGsixgvXfGqlWy-DjQMgj2XX2ffdT2P07Yhjv5ztVuPHdm1PlDs9v7MbfUgG34ClS3JGefPsjBpB0-6U90MvIG7bnfTigynCfQWEHfPSVt1HBi_PfQnPcP16z8c14rH-w0DjLr7EGZjp2DwylowOQM71ggT3qAf_MrhpGK-wu3O9fjATMToRu5p1EKzNH73RUDSzSb_mniq7Y9AJcP2Uq9PkV7q_dkNZa4ylIKsxpXLfw";
+    }
     if (
-      (originBasename && d.includes(originBasename)) ||
-      (o.includes("lahore") && d.includes("lahore")) ||
-      (o.includes("islamabad") && d.includes("islamabad")) ||
-      (o.includes("karachi") && d.includes("karachi")) ||
-      (o.includes("peshawar") && d.includes("peshawar")) ||
-      (o.includes("multan") && d.includes("multan"))
+      destLoc?.district?.includes("Bahawalpur") ||
+      destLoc?.district?.includes("Bahawalnagar") ||
+      destLoc?.name?.includes("Cholistan")
     ) {
-      return { dist: "~25 km", modeRec: "Intra-City Heritage Circuit & Local Transit" };
+      return "https://images.unsplash.com/photo-1590077428593-a55bb07c4665?q=80&w=1200&auto=format&fit=crop";
     }
-
-    // 2. Destination: Lahore
-    if (d.includes("lahore")) {
-      if (o.includes("islamabad")) return { dist: "~370 km", modeRec: "M2 Motorway Direct Vector (~4.5 hrs)" };
-      if (o.includes("karachi")) return { dist: "~1,210 km", modeRec: "Direct Air Flight / M5 Motorway (~2 hrs flight)" };
-      if (o.includes("peshawar")) return { dist: "~490 km", modeRec: "M1 ➔ M2 Motorway Vector (~5.5 hrs)" };
-      if (o.includes("multan")) return { dist: "~340 km", modeRec: "M4 Motorway Direct Vector (~4 hrs)" };
-      return { dist: "~380 km", modeRec: "Inter-city Motorway Route" };
+    if (destLoc?.name?.includes("Lahore") || destLoc?.district?.includes("Lahore")) {
+      return "https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=1200&auto=format&fit=crop";
     }
-
-    // 3. Destination: Swat / Kalam
-    if (d.includes("swat") || d.includes("kalam") || d.includes("mingora")) {
-      if (o.includes("islamabad")) return { dist: "~240 km", modeRec: "M1 ➔ Swat Expressway (M16) (~4.5 hrs)" };
-      if (o.includes("lahore")) return { dist: "~590 km", modeRec: "M2 ➔ M1 ➔ Swat Expressway (~7.5 hrs)" };
-      if (o.includes("karachi")) return { dist: "~1,680 km", modeRec: "Air Flight to ISB + Swat Expressway Transit" };
-      if (o.includes("peshawar")) return { dist: "~180 km", modeRec: "M1 ➔ Swat Expressway (~3 hrs)" };
-      if (o.includes("multan")) return { dist: "~770 km", modeRec: "M4 ➔ M2 ➔ Swat Expressway (~9.5 hrs)" };
-      return { dist: "~320 km", modeRec: "Expressway & Mountain Pass" };
+    if (destLoc?.province === "Balochistan") {
+      return "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format&fit=crop";
     }
-
-    // 4. Destination: Gwadar / Makran
-    if (d.includes("gwadar") || d.includes("makran") || d.includes("balochistan")) {
-      if (o.includes("karachi")) return { dist: "~630 km", modeRec: "Makran Coastal Highway (N10) (~7 hrs)" };
-      if (o.includes("lahore")) return { dist: "~1,320 km", modeRec: "Direct Air Flight to Gwadar (GWD) (~2 hrs)" };
-      if (o.includes("islamabad")) return { dist: "~1,580 km", modeRec: "Direct Air Flight to Gwadar Airport" };
-      return { dist: "~650 km", modeRec: "Coastal Highway Vector" };
+    if (destLoc?.province === "Khyber Pakhtunkhwa") {
+      return "https://images.unsplash.com/photo-1596895111956-bf1cf0599ce5?q=80&w=1200&auto=format&fit=crop";
     }
-
-    // 5. Destination: Skardu / Baltistan
-    if (d.includes("skardu") || d.includes("deosai") || d.includes("baltistan")) {
-      if (o.includes("karachi")) return { dist: "~2,050 km", modeRec: "Direct Air Flight to Skardu (KDU) Recommended" };
-      if (o.includes("lahore")) return { dist: "~1,010 km", modeRec: "M2 ➔ Hazara Expressway ➔ Jaglot-Skardu Rd" };
-      if (o.includes("peshawar")) return { dist: "~680 km", modeRec: "M1 ➔ Hazara Expressway ➔ Jaglot-Skardu Rd" };
-      if (o.includes("multan")) return { dist: "~1,180 km", modeRec: "M4 ➔ Hazara ➔ Jaglot-Skardu Rd" };
-      return { dist: "~640 km", modeRec: "Karakoram Highway ➔ Jaglot-Skardu Road" };
+    if (destLoc?.province === "Azad Kashmir") {
+      return "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1200&auto=format&fit=crop";
     }
-
-    // 6. Destination: Hunza / Gojal / Gilgit (Default North Mountain Vector)
-    if (o.includes("karachi")) return { dist: "~1,950 km", modeRec: "Air Flight to Gilgit/ISB + 4x4 Staging Recommended" };
-    if (o.includes("lahore")) return { dist: "~940 km", modeRec: "M2 Motorway ➔ Hazara Expressway ➔ KKH" };
-    if (o.includes("peshawar")) return { dist: "~620 km", modeRec: "M1 Motorway ➔ Hazara Expressway ➔ KKH" };
-    if (o.includes("multan")) return { dist: "~1,120 km", modeRec: "M4 Motorway ➔ Hazara Expressway ➔ KKH" };
-    return { dist: "~580 km", modeRec: "Karakoram Highway / Babusar Pass Route" };
-  };
-
-  const routeTelemetry = getRouteTelemetry();
+    return "https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=1200&auto=format&fit=crop";
+  }, [destinationPlaces, destinationLocation]);
 
   const fetchBackendCities = async () => {
     try {
@@ -306,35 +694,39 @@ function PlannerContent() {
 
   const toggleInterest = (id: string) => {
     if (selectedInterests.includes(id)) {
-      setSelectedInterests(selectedInterests.filter((item) => item !== id));
+      if (selectedInterests.length > 1) {
+        setSelectedInterests(selectedInterests.filter((item) => item !== id));
+      }
     } else {
       setSelectedInterests([...selectedInterests, id]);
     }
   };
 
   const handleSurpriseMe = () => {
-    const keys = Object.keys(DESTINATION_PRESETS);
-    const randomKey = keys[Math.floor(Math.random() * keys.length)];
-    const preset = DESTINATION_PRESETS[randomKey];
-    setDestination(`${preset.name}, ${preset.region}`);
-    setActivePreset(preset);
+    const touristHubs = PAKISTAN_LOCATIONS.filter((l) => l.is_tourist_hub);
+    const randomLoc = touristHubs[Math.floor(Math.random() * touristHubs.length)];
+    const formattedName = `${randomLoc.name}, ${randomLoc.province}`;
+    setDestination(formattedName);
+    setDestinationLocation(randomLoc);
   };
 
   const handlePopularChip = (cityName: string) => {
-    const key = cityName.toLowerCase();
-    if (DESTINATION_PRESETS[key]) {
-      const preset = DESTINATION_PRESETS[key];
-      setDestination(`${preset.name}, ${preset.region}`);
-      setActivePreset(preset);
+    const loc = findPakistanLocation(cityName);
+    if (loc) {
+      const formattedName = `${loc.name}, ${loc.province}`;
+      setDestination(formattedName);
+      setDestinationLocation(loc);
     } else {
-      setDestination(`${cityName} Region, Pakistan`);
+      setDestination(`${cityName}, Pakistan`);
     }
   };
 
-  const handleTemplatePill = (presetDest: string, presetDays: number, presetBudget: number) => {
-    setDestination(presetDest);
-    setDaysCount(presetDays);
-    setBudget(presetBudget);
+  const handleTemplatePill = (template: (typeof QUICK_TEMPLATES)[0]) => {
+    setDestination(template.destName);
+    const loc = findPakistanLocation(template.destName);
+    if (loc) setDestinationLocation(loc);
+    setDaysCount(template.days);
+    setBudget(template.budget);
   };
 
   const handleGenerate = async () => {
@@ -342,11 +734,17 @@ function PlannerContent() {
 
     try {
       let matchedCityId = preselectedPlace?.city_id;
+
       if (!matchedCityId) {
-        const matchedCity = cities.find((c) =>
-          destination.toLowerCase().includes(c.name.toLowerCase())
+        const destLoc = destinationLocation;
+        const targetSlug = destLoc?.db_city_slug || destLoc?.parent_hub_slug;
+        const matchedCity = cities.find(
+          (c) =>
+            (targetSlug && c.slug === targetSlug) ||
+            (destLoc?.name && c.name.toLowerCase().includes(destLoc.name.toLowerCase())) ||
+            destination.toLowerCase().includes(c.name.toLowerCase())
         );
-        matchedCityId = matchedCity ? matchedCity.id : (cities[0]?.id || "");
+        matchedCityId = matchedCity ? matchedCity.id : cities[0]?.id || "";
       }
 
       if (matchedCityId) {
@@ -367,8 +765,11 @@ function PlannerContent() {
             lodging_style: lodgingStyle,
             interests: selectedInterests,
             anchor_place_id: preselectedPlace?.id || null,
-          }
+            route_distance_km: routeMetrics.drivingDistanceKm,
+            route_corridor: routeMetrics.corridorName,
+          },
         };
+
         const createdTrip = await tripsApi.create(payload);
 
         if (preselectedPlace?.id && createdTrip?.id) {
@@ -387,28 +788,28 @@ function PlannerContent() {
         setTimeout(() => {
           setIsGenerating(false);
           router.push(`/trips/${createdTrip.id}`);
-        }, 1500);
+        }, 1200);
         return;
       }
     } catch {
-      // Client fallback
+      // Fallback
     }
 
     setTimeout(() => {
       setIsGenerating(false);
       router.push("/trips");
-    }, 2800);
+    }, 2500);
   };
 
   // Budget Calculations
   const usdRate = 278;
-  const stayCost = Math.round(budget * 0.40);
-  const travelCost = Math.round(budget * 0.30);
-  const foodCost = Math.round(budget * 0.20);
-  const bufferCost = Math.round(budget * 0.10);
+  const stayCost = Math.round(budget * 0.4);
+  const travelCost = Math.round(budget * 0.3);
+  const foodCost = Math.round(budget * 0.2);
+  const bufferCost = Math.round(budget * 0.1);
   const usdVal = Math.round(budget / usdRate);
 
-  const routeFitPercent = Math.min(99, 86 + selectedInterests.length * 3);
+  const routeFitPercent = Math.min(99, 88 + selectedInterests.length * 2);
 
   const budgetTierText =
     budget < 40000
@@ -421,6 +822,14 @@ function PlannerContent() {
 
   const pacingText =
     daysCount <= 3 ? "Brisk Pacing" : daysCount <= 8 ? "Optimal Pace" : "Immersive Expedition";
+
+  // Selected interest labels for concierge text
+  const activeInterestLabels = useMemo(() => {
+    return destinationMatrix.options
+      .filter((opt) => selectedInterests.includes(opt.id))
+      .map((opt) => opt.label.replace(/^[^\s]+ /, ""))
+      .slice(0, 2);
+  }, [destinationMatrix, selectedInterests]);
 
   return (
     <div className="bg-background text-on-surface antialiased font-sans selection:bg-secondary-container selection:text-on-secondary-container min-h-screen flex flex-col">
@@ -440,18 +849,16 @@ function PlannerContent() {
           <div className="pt-4 pb-8 border-b border-outline-variant/60 mb-8">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div className="max-w-3xl">
-                {/* Clean Solid Editorial Heading */}
                 <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-on-surface">
                   Design your bespoke expedition with algorithmic precision.
                 </h1>
                 <p className="font-sans text-sm sm:text-base text-on-surface-variant mt-2.5 leading-relaxed max-w-2xl">
-                  Synthesizing topographic elevation, real-time Karakoram road telemetry, curated boutique glamping, and private 4x4 staging into a flawless multi-day itinerary.
+                  Synthesizing topographic elevation, real-time Pakistani road telemetry, curated boutique glamping, and private 4x4 staging into a flawless multi-day itinerary.
                 </p>
               </div>
 
               {/* Mode Selector & Action Blueprint Controls */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {/* Segmented Mode Selector */}
                 <div className="flex items-center bg-surface-container-high/70 p-1 rounded-xl border border-outline-variant">
                   <button
                     onClick={() => setMode("bespoke")}
@@ -498,6 +905,7 @@ function PlannerContent() {
                   <button
                     onClick={() => {
                       setDestination("Hunza Valley & Gojal, Gilgit-Baltistan");
+                      setDestinationLocation(findPakistanLocation("Hunza"));
                       setDaysCount(5);
                       setBudget(50000);
                     }}
@@ -510,16 +918,6 @@ function PlannerContent() {
                     </span>
                     <span>Reset</span>
                   </button>
-                  <button
-                    onClick={() => alert("Expedition Blueprint Loaded!")}
-                    className="px-3 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs transition-colors flex items-center gap-1.5 border border-outline-variant cursor-pointer"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-sm text-secondary">
-                      download
-                    </span>
-                    <span>Load Blueprint</span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -530,32 +928,16 @@ function PlannerContent() {
                 <span className="material-symbols-outlined text-xs text-secondary">dataset</span>{" "}
                 Quick Templates:
               </span>
-              <button
-                onClick={() => handleTemplatePill("Hunza Valley & Gojal, Gilgit-Baltistan", 5, 55000)}
-                className="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>🍂 Hunza Autumn Peak (5D)</span>
-                <span className="text-secondary font-mono text-[10px]">98% Fit</span>
-              </button>
-              <button
-                onClick={() => handleTemplatePill("Skardu Glacial Lakes & Deosai Plains, Baltistan", 7, 85000)}
-                className="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>❄️ Skardu Glacial Trek (7D)</span>
-                <span className="text-secondary font-mono text-[10px]">95% Fit</span>
-              </button>
-              <button
-                onClick={() => handleTemplatePill("Lahore Walled City & Mughal Heritage", 3, 32000)}
-                className="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>🕌 Lahore Heritage & Food Trail (3D)</span>
-              </button>
-              <button
-                onClick={() => handleTemplatePill("Makran Coastal Highway & Gwadar, Balochistan", 4, 48000)}
-                className="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>🌊 Makran Coastal Run (4D)</span>
-              </button>
+              {QUICK_TEMPLATES.map((tmpl) => (
+                <button
+                  key={tmpl.label}
+                  onClick={() => handleTemplatePill(tmpl)}
+                  className="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>{tmpl.label}</span>
+                  <span className="text-secondary font-mono text-[10px]">{tmpl.fit}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -577,7 +959,8 @@ function PlannerContent() {
                         </span>
                       </div>
                       <p className="text-sm sm:text-base font-extrabold text-on-surface mt-0.5">
-                        {preselectedPlace.name} {preselectedPlace.city_name ? `• ${preselectedPlace.city_name}` : ""}
+                        {preselectedPlace.name}{" "}
+                        {preselectedPlace.city_name ? `• ${preselectedPlace.city_name}` : ""}
                       </p>
                       <p className="text-xs text-on-surface-variant">
                         Designing route starting/featuring this place. Adjust days, budget, and options below.
@@ -594,8 +977,9 @@ function PlannerContent() {
                   </button>
                 </div>
               )}
+
               {/* STEP 01: Departure Hub & Destination Vector */}
-              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative overflow-hidden group">
+              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative z-30 group">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 h-7 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center font-mono text-xs font-bold text-secondary">
@@ -606,87 +990,52 @@ function PlannerContent() {
                         Departure Hub & Destination Vector
                       </h2>
                       <p className="text-xs text-on-surface-variant">
-                        Select your starting city and primary destination hub for PostGIS route calculations
+                        Select any Pakistani city, tehsil, or district hub for live PostGIS route calculations
                       </p>
                     </div>
                   </div>
                   <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-mono text-[11px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> PostGIS Telemetry Active
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> 180+ Geocoded Hubs
                   </span>
                 </div>
 
                 <div className="space-y-4">
-                  {/* Origin City Hub Selection */}
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant mb-1.5">
-                      Starting City / Hub (Origin Vector):
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-secondary">
-                        <span className="material-symbols-outlined text-lg">my_location</span>
-                      </div>
-                      <input
-                        className="w-full pl-10 pr-4 py-3 bg-surface-container-low hover:bg-surface-container/50 focus:bg-surface-container-lowest border border-outline-variant focus:border-secondary rounded-xl text-on-surface font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-secondary/15 placeholder:text-on-surface-variant/70 shadow-xs"
-                        placeholder="e.g. Islamabad, Lahore, Karachi, Peshawar, Multan"
-                        type="text"
-                        value={originCity}
-                        onChange={(e) => setOriginCity(e.target.value)}
-                      />
-                    </div>
-                    {/* Origin Quick Chips */}
-                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                      <span className="font-mono text-[11px] text-on-surface-variant">
-                        Quick Hubs:
-                      </span>
-                      {[
-                        { label: "Islamabad (ISB Hub)", val: "Islamabad / Rawalpindi (ISB Hub)" },
-                        { label: "Lahore (LHE Hub)", val: "Lahore (LHE Hub)" },
-                        { label: "Karachi (KHI Hub)", val: "Karachi (KHI Flight Hub)" },
-                        { label: "Peshawar (PEW Hub)", val: "Peshawar (PEW Hub)" },
-                        { label: "Multan (MUX Hub)", val: "Multan (MUX Hub)" },
-                      ].map((hub) => (
-                        <button
-                          key={hub.val}
-                          onClick={() => setOriginCity(hub.val)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                            originCity.includes(hub.label.split(" ")[0])
-                              ? "bg-secondary-container/60 text-secondary border-secondary/30 font-semibold"
-                              : "bg-surface-container hover:bg-surface-container-high text-on-surface border-outline-variant"
-                          }`}
-                          type="button"
-                        >
-                          {hub.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Origin City Hub Selection (CityAutocomplete) */}
+                  <CityAutocomplete
+                    label="Starting City / Hub (Origin Vector):"
+                    icon="my_location"
+                    placeholder="e.g. Chishtian, Bahawalpur, Hasilpur, Lahore, Karachi, Islamabad..."
+                    value={originCity}
+                    onChange={(val, loc) => {
+                      setOriginCity(val);
+                      if (loc) {
+                        setOriginLocation(loc);
+                      } else {
+                        const found = findPakistanLocation(val);
+                        if (found) setOriginLocation(found);
+                      }
+                    }}
+                    popularChips={POPULAR_ORIGIN_HUBS}
+                  />
 
-                  {/* Destination Vector */}
+                  {/* Destination Vector (CityAutocomplete) */}
                   <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant mb-1.5">
-                      Target Destination / Valley:
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-secondary">
-                        <span className="material-symbols-outlined text-lg">place</span>
-                      </div>
-                      <input
-                        className="w-full pl-10 pr-28 py-3 bg-surface-container-low hover:bg-surface-container/50 focus:bg-surface-container-lowest border border-outline-variant focus:border-secondary rounded-xl text-on-surface font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-secondary/15 placeholder:text-on-surface-variant/70 shadow-xs"
-                        placeholder="Enter target valley, city, or coordinates (e.g., Hunza, Skardu, Swat)"
-                        type="text"
-                        value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                      />
-                      {destination && (
-                        <button
-                          onClick={() => setDestination("")}
-                          className="absolute right-2 top-1.5 bottom-1.5 px-3 rounded-lg bg-secondary-container/60 hover:bg-secondary-container text-on-secondary-container font-medium text-xs flex items-center gap-1 transition-all cursor-pointer"
-                          type="button"
-                        >
-                          <span className="material-symbols-outlined text-xs">close</span> Clear
-                        </button>
-                      )}
-                    </div>
+                    <CityAutocomplete
+                      label="Target Destination / Tehsil Hub:"
+                      icon="place"
+                      placeholder="e.g. Bahawalpur, Hasilpur, Fort Abbas, Hunza, Skardu, Swat, Gwadar..."
+                      value={destination}
+                      onChange={(val, loc) => {
+                        setDestination(val);
+                        if (loc) {
+                          setDestinationLocation(loc);
+                        } else {
+                          const found = findPakistanLocation(val);
+                          if (found) setDestinationLocation(found);
+                        }
+                      }}
+                      filterTouristHubsOnly={false}
+                    />
 
                     {/* Surprise Me & Trending Chips */}
                     <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
@@ -710,16 +1059,18 @@ function PlannerContent() {
                         <span className="font-mono text-[11px] text-on-surface-variant">
                           Trending:
                         </span>
-                        {["Hunza", "Skardu", "Swat", "Gwadar", "Lahore"].map((chip) => (
-                          <button
-                            key={chip}
-                            onClick={() => handlePopularChip(chip)}
-                            className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high rounded-lg text-xs text-on-surface font-medium border border-outline-variant transition-colors cursor-pointer"
-                            type="button"
-                          >
-                            {chip}
-                          </button>
-                        ))}
+                        {["Bahawalpur", "Hasilpur", "Hunza", "Skardu", "Swat", "Gwadar", "Lahore"].map(
+                          (chip) => (
+                            <button
+                              key={chip}
+                              onClick={() => handlePopularChip(chip)}
+                              className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high rounded-lg text-xs text-on-surface font-medium border border-outline-variant transition-colors cursor-pointer"
+                              type="button"
+                            >
+                              {chip}
+                            </button>
+                          )
+                        )}
                       </div>
                     </div>
                   </div>
@@ -727,7 +1078,7 @@ function PlannerContent() {
               </section>
 
               {/* STEP 02: Temporal Window & Departure Start Date */}
-              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury">
+              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative z-20">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 h-7 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center font-mono text-xs font-bold text-secondary">
@@ -743,7 +1094,7 @@ function PlannerContent() {
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 rounded-full bg-secondary-container/60 text-secondary font-mono text-[11px] font-semibold">
-                    {seasonalityGate}
+                    {climateMetrics.seasonTag}
                   </span>
                 </div>
 
@@ -783,12 +1134,12 @@ function PlannerContent() {
                       </button>
                     </div>
                     <div className="mt-2 pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[11px] text-on-surface-variant">
-                      <span>Min: 2 Days</span>
+                      <span>Min: 1 Day</span>
                       <span>Max: 21 Days</span>
                     </div>
                   </div>
 
-                  {/* Date Range, Picker & Telemetry (7 cols) */}
+                  {/* Date Range, Picker & Dynamic Telemetry (7 cols) */}
                   <div className="sm:col-span-7 p-4 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-medium">
@@ -814,8 +1165,8 @@ function PlannerContent() {
                         <span className="font-display text-sm font-bold text-on-surface block truncate">
                           {startDateFormatted} – {endDateFormatted}
                         </span>
-                        <span className="text-xs text-on-surface-variant block">
-                          Route Vector: {routeTelemetry.dist} ({routeTelemetry.modeRec})
+                        <span className="text-xs text-on-surface-variant block truncate">
+                          Route Vector: ~{routeMetrics.drivingDistanceKm} km ({routeMetrics.drivingTimeFormatted})
                         </span>
                       </div>
                     </div>
@@ -824,10 +1175,10 @@ function PlannerContent() {
                         <span className="material-symbols-outlined text-xs text-secondary">
                           thermostat
                         </span>{" "}
-                        14°C High / 2°C Night
+                        {climateMetrics.tempFormatted}
                       </span>
                       <span className="text-secondary font-mono font-semibold">
-                        92% Road Passability
+                        {routeMetrics.roadPassabilityPercent}% Road Passability
                       </span>
                     </div>
                   </div>
@@ -835,7 +1186,7 @@ function PlannerContent() {
               </section>
 
               {/* STEP 03: Precision Budget Architecture */}
-              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury">
+              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 h-7 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center font-mono text-xs font-bold text-secondary">
@@ -879,7 +1230,7 @@ function PlannerContent() {
                     </div>
                     <div className="text-left sm:text-right">
                       <span className="text-xs text-secondary font-semibold block">
-                        Includes private 4x4 + local permits
+                        Includes transport + accommodation allocation
                       </span>
                       <span className="text-[11px] text-on-surface-variant">
                         Adjust slider to recalculate dynamically
@@ -892,14 +1243,14 @@ function PlannerContent() {
                     <input
                       className="w-full accent-secondary cursor-pointer h-2.5 bg-surface-container-highest rounded-lg"
                       max="250000"
-                      min="20000"
+                      min="15000"
                       step="5000"
                       type="range"
                       value={budget}
                       onChange={(e) => setBudget(parseInt(e.target.value, 10))}
                     />
                     <div className="flex justify-between text-[11px] font-mono text-on-surface-variant mt-1.5">
-                      <span>Rs. 20k (Backpacker)</span>
+                      <span>Rs. 15k (Backpacker)</span>
                       <span>Rs. 100k (Luxury Prado)</span>
                       <span>Rs. 250k+ (VIP Glamping)</span>
                     </div>
@@ -918,7 +1269,7 @@ function PlannerContent() {
 
                     <div className="h-3 w-full bg-surface-container-highest rounded-full flex overflow-hidden p-0.5 gap-0.5">
                       <div className="h-full bg-secondary rounded-l-full transition-all duration-300" style={{ width: "40%" }} title="Lodging: 40%" />
-                      <div className="h-full bg-teal-600 transition-all duration-300" style={{ width: "30%" }} title="Transit & 4x4: 30%" />
+                      <div className="h-full bg-teal-600 transition-all duration-300" style={{ width: "30%" }} title="Transit & Transport: 30%" />
                       <div className="h-full bg-amber-600 transition-all duration-300" style={{ width: "20%" }} title="Expeditions & Passes: 20%" />
                       <div className="h-full bg-stone-500 rounded-r-full transition-all duration-300" style={{ width: "10%" }} title="Buffer: 10%" />
                     </div>
@@ -934,7 +1285,7 @@ function PlannerContent() {
                       </div>
                       <div className="bg-surface-container-low p-2.5 rounded-lg border border-outline-variant/60">
                         <span className="text-on-surface-variant text-[11px] flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-teal-600" /> 4x4 Transit (30%)
+                          <span className="w-2 h-2 rounded-full bg-teal-600" /> Transit (30%)
                         </span>
                         <span className="font-mono font-bold text-on-surface text-sm block mt-0.5">
                           {currency === "PKR" ? `Rs. ${travelCost.toLocaleString()}` : `$${Math.round(travelCost / usdRate)}`}
@@ -961,44 +1312,53 @@ function PlannerContent() {
                 </div>
               </section>
 
-              {/* STEP 04: Taste & Experience Matrix */}
-              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury">
+              {/* STEP 04: Taste & Experience Matrix (Dynamically generated per destination geography) */}
+              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 h-7 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center font-mono text-xs font-bold text-secondary">
                       04
                     </span>
                     <div>
-                      <h2 className="font-display font-bold text-base sm:text-lg text-on-surface">
-                        Taste & Experience Matrix
-                      </h2>
-                      <p className="text-xs text-on-surface-variant">
-                        Select core focal themes to tailor route cadence & stops
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-display font-bold text-base sm:text-lg text-on-surface">
+                          Taste & Experience Matrix
+                        </h2>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-secondary/10 text-secondary uppercase tracking-wider">
+                          {destinationMatrix.categoryBadge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant mt-0.5">
+                        {destinationMatrix.subtitle}
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs text-on-surface-variant font-mono">
+                  <span className="text-xs text-secondary font-mono font-semibold px-2.5 py-1 rounded-lg bg-secondary-container/50 shrink-0">
                     {selectedInterests.length} Active
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
-                  {INTEREST_OPTIONS.map((opt) => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {destinationMatrix.options.map((opt) => {
                     const isSelected = selectedInterests.includes(opt.id);
                     return (
                       <button
                         key={opt.id}
                         onClick={() => toggleInterest(opt.id)}
-                        className={`px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                        className={`p-3 rounded-xl font-semibold text-xs flex items-center justify-between gap-2 transition-all cursor-pointer text-left ${
                           isSelected
-                            ? "bg-secondary text-on-primary shadow-xs"
+                            ? "bg-secondary text-on-primary shadow-xs border border-secondary font-bold"
                             : "bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant"
                         }`}
                         type="button"
                       >
-                        <span>{opt.label}</span>
-                        {isSelected && (
-                          <span className="material-symbols-outlined text-xs">check</span>
+                        <span className="truncate">{opt.label}</span>
+                        {isSelected ? (
+                          <span className="material-symbols-outlined text-sm shrink-0">
+                            check_circle
+                          </span>
+                        ) : (
+                          <span className="w-4 h-4 rounded-full border border-outline-variant shrink-0" />
                         )}
                       </button>
                     );
@@ -1007,7 +1367,7 @@ function PlannerContent() {
               </section>
 
               {/* STEP 05: Travel Dynamics & Cohort */}
-              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury">
+              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 h-7 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center font-mono text-xs font-bold text-secondary">
@@ -1027,10 +1387,10 @@ function PlannerContent() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { id: "solo", title: "Solo Pioneer", desc: "Nimble, photography & summit pacing", icon: "hiking" },
-                    { id: "couple", title: "Duo / Couples", desc: "Scenic chalets, sunsets & fireside dining", icon: "favorite" },
-                    { id: "family", title: "Family Circle", desc: "Comfortable hotels, gentle walks & kids", icon: "family_restroom" },
-                    { id: "crew", title: "Expedition Crew", desc: "High-energy pass crossing & trails", icon: "groups_3" },
+                    { id: "solo", title: "Solo Pioneer", desc: "Nimble, photography & pacing", icon: "hiking" },
+                    { id: "couple", title: "Duo / Couples", desc: "Scenic chalets, sunsets & dining", icon: "favorite" },
+                    { id: "family", title: "Family Circle", desc: "Comfortable hotels & gentle walks", icon: "family_restroom" },
+                    { id: "crew", title: "Expedition Crew", desc: "High-energy trails & cross-country", icon: "groups_3" },
                   ].map((st) => {
                     const isActive = travelStyle === st.id;
                     return (
@@ -1075,7 +1435,7 @@ function PlannerContent() {
               </section>
 
               {/* STEP 06: Logistics & Velocity Calibration */}
-              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury">
+              <section className="p-6 sm:p-7 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-luxury relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 h-7 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center font-mono text-xs font-bold text-secondary">
@@ -1102,35 +1462,126 @@ function PlannerContent() {
                       Transit Vector Class
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      {[
-                        { id: "car", title: "Private 4x4 Prado", desc: "All terrains & passes", icon: "directions_car" },
-                        { id: "flight", title: "Flight + 4x4", desc: "Gilgit / Skardu Air", icon: "flight" },
-                        { id: "bus", title: "Executive Coach", desc: "KKH highway cruise", icon: "directions_bus" },
-                        { id: "hybrid", title: "Hybrid Staged", desc: "Intermodal transit", icon: "sync_alt" },
-                      ].map((tm) => (
+                      {/* Car / 4x4 */}
+                      <button
+                        onClick={() => setTransitMode("car")}
+                        className={`p-3 rounded-xl border text-left flex flex-col items-start gap-1 cursor-pointer transition-all ${
+                          transitMode === "car"
+                            ? "bg-surface-container-low border-2 border-secondary shadow-xs"
+                            : "bg-surface-container-low border-outline-variant hover:bg-surface-container"
+                        }`}
+                        type="button"
+                      >
+                        <span
+                          className={`material-symbols-outlined text-xl ${
+                            transitMode === "car" ? "text-secondary" : "text-on-surface-variant"
+                          }`}
+                        >
+                          directions_car
+                        </span>
+                        <span className="font-display font-bold text-xs text-on-surface">
+                          {destinationLocation && destinationLocation.elevation_m > 1800
+                            ? "Private 4x4 Prado"
+                            : routeMetrics.drivingDistanceKm < 80
+                            ? "Private Car / Taxi"
+                            : "Private Sedan / SUV"}
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant">
+                          {routeMetrics.drivingTimeFormatted} road drive
+                        </span>
+                      </button>
+
+                      {/* Flight (Dynamically enabled/disabled) */}
+                      {routeMetrics.canFlyCommercial ? (
                         <button
-                          key={tm.id}
-                          onClick={() => setTransitMode(tm.id as any)}
+                          onClick={() => setTransitMode("flight")}
                           className={`p-3 rounded-xl border text-left flex flex-col items-start gap-1 cursor-pointer transition-all ${
-                            transitMode === tm.id
-                              ? "bg-surface-container-low border-2 border-secondary"
+                            transitMode === "flight"
+                              ? "bg-surface-container-low border-2 border-secondary shadow-xs"
                               : "bg-surface-container-low border-outline-variant hover:bg-surface-container"
                           }`}
                           type="button"
                         >
                           <span
                             className={`material-symbols-outlined text-xl ${
-                              transitMode === tm.id ? "text-secondary" : "text-on-surface-variant"
+                              transitMode === "flight" ? "text-secondary" : "text-on-surface-variant"
                             }`}
                           >
-                            {tm.icon}
+                            flight
                           </span>
                           <span className="font-display font-bold text-xs text-on-surface">
-                            {tm.title}
+                            Flight + Staged 4x4
                           </span>
-                          <span className="text-[10px] text-on-surface-variant">{tm.desc}</span>
+                          <span className="text-[10px] text-emerald-700 font-medium">
+                            {routeMetrics.flightRouteNote || "Direct Air Connect"}
+                          </span>
                         </button>
-                      ))}
+                      ) : (
+                        <div
+                          className="p-3 rounded-xl border border-outline-variant/40 bg-surface-container-low/50 text-left flex flex-col items-start gap-1 opacity-60 cursor-not-allowed"
+                          title="Commercial flight not applicable for short distance or non-airport locations"
+                        >
+                          <span className="material-symbols-outlined text-xl text-on-surface-variant">
+                            flight_takeoff
+                          </span>
+                          <span className="font-display font-bold text-xs text-on-surface-variant">
+                            Flight (N/A)
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant">
+                            {routeMetrics.drivingDistanceKm < 350 ? "< 350 km overland" : "No commercial airport"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Bus / Coach */}
+                      <button
+                        onClick={() => setTransitMode("bus")}
+                        className={`p-3 rounded-xl border text-left flex flex-col items-start gap-1 cursor-pointer transition-all ${
+                          transitMode === "bus"
+                            ? "bg-surface-container-low border-2 border-secondary shadow-xs"
+                            : "bg-surface-container-low border-outline-variant hover:bg-surface-container"
+                        }`}
+                        type="button"
+                      >
+                        <span
+                          className={`material-symbols-outlined text-xl ${
+                            transitMode === "bus" ? "text-secondary" : "text-on-surface-variant"
+                          }`}
+                        >
+                          directions_bus
+                        </span>
+                        <span className="font-display font-bold text-xs text-on-surface">
+                          Executive Coach
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant">
+                          Expressway & bus lines
+                        </span>
+                      </button>
+
+                      {/* Hybrid / Train */}
+                      <button
+                        onClick={() => setTransitMode("hybrid")}
+                        className={`p-3 rounded-xl border text-left flex flex-col items-start gap-1 cursor-pointer transition-all ${
+                          transitMode === "hybrid"
+                            ? "bg-surface-container-low border-2 border-secondary shadow-xs"
+                            : "bg-surface-container-low border-outline-variant hover:bg-surface-container"
+                        }`}
+                        type="button"
+                      >
+                        <span
+                          className={`material-symbols-outlined text-xl ${
+                            transitMode === "hybrid" ? "text-secondary" : "text-on-surface-variant"
+                          }`}
+                        >
+                          sync_alt
+                        </span>
+                        <span className="font-display font-bold text-xs text-on-surface">
+                          Hybrid / Staged
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant">
+                          Flexible multimodal
+                        </span>
+                      </button>
                     </div>
                   </div>
 
@@ -1141,8 +1592,8 @@ function PlannerContent() {
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       {[
-                        { id: "glamping", title: "Heritage Glamping & Resorts", desc: "Serena, Luxus & luxury domes", icon: "chalet" },
-                        { id: "midrange", title: "Boutique Scenic Mid-Range", desc: "Panoramic riverfront hotels", icon: "hotel" },
+                        { id: "glamping", title: "Heritage Glamping & Resorts", desc: "Serena, Luxus & luxury chalets", icon: "chalet" },
+                        { id: "midrange", title: "Boutique Scenic Mid-Range", desc: "Panoramic verified hotels", icon: "hotel" },
                         { id: "homestay", title: "Curated Homestays", desc: "Authentic local village hosts", icon: "cottage" },
                       ].map((ld) => (
                         <button
@@ -1150,7 +1601,7 @@ function PlannerContent() {
                           onClick={() => setLodgingStyle(ld.id as any)}
                           className={`p-3 rounded-xl border text-left flex items-start gap-2.5 cursor-pointer transition-all ${
                             lodgingStyle === ld.id
-                              ? "bg-surface-container-low border-2 border-secondary"
+                              ? "bg-surface-container-low border-2 border-secondary shadow-xs"
                               : "bg-surface-container-low border-outline-variant hover:bg-surface-container"
                           }`}
                           type="button"
@@ -1180,7 +1631,7 @@ function PlannerContent() {
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-surface-container-low p-1 rounded-xl border border-outline-variant">
                       {[
-                        { id: "relaxed", label: "Relaxed (3h transit/day)" },
+                        { id: "relaxed", label: "Relaxed (Gentle Pacing)" },
                         { id: "balanced", label: "Balanced Harmony" },
                         { id: "intensive", label: "Intensive Explorer" },
                       ].map((pc) => (
@@ -1228,7 +1679,7 @@ function PlannerContent() {
                   <div className="flex items-center gap-3">
                     <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/30 border border-white/10 font-mono text-xs text-white/90">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Solve Time: ~2.8s
+                      Solve Time: ~1.8s
                     </span>
                     <span className="material-symbols-outlined text-xl group-hover:translate-x-1.5 transition-transform">
                       arrow_forward
@@ -1269,24 +1720,24 @@ function PlannerContent() {
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded bg-surface-container text-secondary font-mono text-[10px] font-semibold border border-secondary/20 uppercase tracking-wider">
-                    SYNC ACTIVE
+                    {isLoadingPlaces ? "SYNCING..." : "SYNC ACTIVE"}
                   </span>
                 </div>
 
                 {/* Cinematic Visual Banner */}
                 <div className="relative rounded-xl overflow-hidden shadow-xs mb-4 group">
                   <img
-                    alt={activePreset.name}
+                    alt={destinationLocation?.name || destination}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-700"
-                    src={activePreset.image}
+                    src={heroImage}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex flex-col justify-between p-3.5 text-white">
                     <div className="flex justify-between items-start">
                       <span className="px-2.5 py-1 rounded-md bg-black/40 backdrop-blur-md border border-white/20 font-mono text-[10px] tracking-wider uppercase text-emerald-300 font-semibold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Live Satellite Cadence
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Geocoded Vector Hub
                       </span>
                       <span className="px-2 py-0.5 rounded bg-white/20 backdrop-blur-md text-[10px] font-mono">
-                        17:42 PKT Golden Hr
+                        {routeMetrics.transitDifficulty.toUpperCase()} ROUTE
                       </span>
                     </div>
                     <div>
@@ -1296,21 +1747,23 @@ function PlannerContent() {
                             Destination Focal Point
                           </span>
                           <h3 className="font-display text-lg font-bold tracking-tight text-white leading-tight">
-                            {activePreset.name}
+                            {destinationLocation?.name || destination}
                           </h3>
                         </div>
                         <div className="text-right">
                           <span className="font-mono text-xs font-bold text-white block">
-                            Elev. {activePreset.elevation}
+                            Elev. {destinationLocation ? `${destinationLocation.elevation_m}m` : "N/A"}
                           </span>
-                          <span className="text-[10px] text-white/80">{activePreset.region}</span>
+                          <span className="text-[10px] text-white/80">
+                            {destinationLocation ? `${destinationLocation.province}` : "Pakistan"}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Route Fit & Weather Widgets */}
+                {/* Route Fit & Telemetry Widgets */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant flex items-center justify-between">
                     <div>
@@ -1352,7 +1805,7 @@ function PlannerContent() {
                   <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-medium">
-                        Telemetry
+                        Seasonal Forecast
                       </span>
                       <span className="material-symbols-outlined text-amber-600 text-base">
                         sunny
@@ -1360,17 +1813,39 @@ function PlannerContent() {
                     </div>
                     <div>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="font-display text-2xl font-extrabold text-on-surface tracking-tight">
-                          {activePreset.weatherTemp}
+                        <span className="font-display text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                          {climateMetrics.tempHighC}°C
                         </span>
                         <span className="text-xs text-on-surface-variant font-medium">
-                          {activePreset.weather}
+                          / {climateMetrics.tempLowC}°C night
                         </span>
                       </div>
-                      <span className="text-[10px] text-secondary font-medium block">
-                        {activePreset.foliage}
+                      <span className="text-[10px] text-secondary font-medium block truncate">
+                        {climateMetrics.condition}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Road & Transit Vector Box */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant mb-4 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono font-semibold">
+                    <span className="text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-secondary">
+                        alt_route
+                      </span>{" "}
+                      Geospatial Transit Corridor
+                    </span>
+                    <span className="text-secondary">{routeMetrics.drivingTimeFormatted}</span>
+                  </div>
+                  <div className="text-xs font-semibold text-on-surface truncate">
+                    {routeMetrics.corridorName}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-outline-variant/50">
+                    <span>Driving Distance: ~{routeMetrics.drivingDistanceKm} km</span>
+                    <span className="font-mono text-secondary font-semibold">
+                      {routeMetrics.roadPassabilityPercent}% Passability
+                    </span>
                   </div>
                 </div>
 
@@ -1390,55 +1865,50 @@ function PlannerContent() {
                       <span className="material-symbols-outlined text-xs text-emerald-600">
                         check_circle
                       </span>
-                      <span>Budget: PASS</span>
+                      <span>Budget: OK</span>
                     </div>
                     <div className="bg-surface-container-lowest p-1.5 rounded border border-outline-variant/60 flex items-center gap-1 text-emerald-800 font-semibold">
                       <span className="material-symbols-outlined text-xs text-emerald-600">
                         check_circle
                       </span>
-                      <span>KKH: OPEN</span>
+                      <span>Road: CLEAR</span>
                     </div>
                     <div className="bg-surface-container-lowest p-1.5 rounded border border-outline-variant/60 flex items-center gap-1 text-emerald-800 font-semibold">
                       <span className="material-symbols-outlined text-xs text-emerald-600">
                         check_circle
                       </span>
-                      <span>Pacing: OPTIMAL</span>
+                      <span>Pacing: FIT</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Day-by-Day Micro-Timeline Pipeline */}
+                {/* Day-by-Day Dynamic Micro-Timeline Pipeline */}
                 <div className="space-y-2.5 mb-4">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-medium">
                       Synthesized Waypoint Pipeline
                     </span>
                     <span className="text-[11px] text-secondary font-mono font-semibold">
-                      {Math.min(activePreset.waypoints.length, daysCount)} Vectors
+                      {synthesizedWaypoints.length} Vectors
                     </span>
                   </div>
                   <div className="relative pl-5 space-y-3.5 before:content-[''] before:absolute before:top-2.5 before:bottom-2.5 before:left-1.5 before:w-0.5 before:bg-outline-variant">
-                    {activePreset.waypoints.slice(0, Math.min(activePreset.waypoints.length, daysCount)).map((wp, idx) => {
-                      const dynamicTitle = idx === 0 && wp.title.includes("Islamabad")
-                        ? wp.title.replace("Islamabad", originCity.split(" ")[0])
-                        : wp.title;
-                      return (
-                        <div key={idx} className="relative group">
-                          <span className="absolute -left-5 top-1 w-3 h-3 rounded-full bg-secondary ring-4 ring-surface-container-lowest" />
-                          <div className="flex items-baseline justify-between">
-                            <span className="font-display font-bold text-xs text-on-surface">
-                              {dynamicTitle}
-                            </span>
-                            <span className="font-mono text-[10px] text-secondary font-semibold">
-                              {wp.type}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">
-                            {wp.desc}
-                          </p>
+                    {synthesizedWaypoints.map((wp, idx) => (
+                      <div key={idx} className="relative group">
+                        <span className="absolute -left-5 top-1 w-3 h-3 rounded-full bg-secondary ring-4 ring-surface-container-lowest" />
+                        <div className="flex items-baseline justify-between">
+                          <span className="font-display font-bold text-xs text-on-surface">
+                            {wp.title}
+                          </span>
+                          <span className="font-mono text-[10px] text-secondary font-semibold shrink-0 ml-2">
+                            {wp.type}
+                          </span>
                         </div>
-                      );
-                    })}
+                        <p className="text-[11px] text-on-surface-variant leading-relaxed mt-0.5">
+                          {wp.desc}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1446,12 +1916,14 @@ function PlannerContent() {
                 <div className="rounded-xl overflow-hidden border border-outline-variant relative group">
                   <div
                     className="w-full h-32 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                    style={{ backgroundImage: `url('${activePreset.mapImage}')` }}
+                    style={{
+                      backgroundImage: `url('https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=1000&auto=format&fit=crop')`,
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
                   <div className="absolute bottom-2 left-2 right-2 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/20 flex items-center justify-between text-on-surface">
                     <span className="font-mono text-[11px] font-semibold flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-secondary" /> {daysCount} Mountain Waypoints Active
+                      <span className="w-2 h-2 rounded-full bg-secondary" /> {daysCount} Days Itinerary Active
                     </span>
                     <Link
                       className="font-display text-xs font-bold text-secondary hover:text-emerald-800 flex items-center gap-0.5"
@@ -1480,7 +1952,13 @@ function PlannerContent() {
                     </span>
                   </div>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Because you selected <strong className="text-on-surface">Haute Photography</strong> and <strong className="text-on-surface">Autumn Peak</strong>, the optimizer prioritized the 17:35 PKT golden hour reflection directly over Ladyfinger & Ultar peaks from Eagle's Nest viewpoint.
+                    Based on your route to <strong className="text-on-surface">{destinationLocation?.name || destination}</strong> and selected focus on{" "}
+                    <strong className="text-on-surface">
+                      {activeInterestLabels.length > 0
+                        ? activeInterestLabels.join(" & ")
+                        : "regional highlights"}
+                    </strong>
+                    , the optimizer calibrated the itinerary via <strong className="text-on-surface">{routeMetrics.corridorName}</strong> ({routeMetrics.drivingTimeFormatted}) with optimal seasonal conditions for {climateMetrics.seasonTag}.
                   </p>
                 </div>
               </div>
@@ -1513,11 +1991,21 @@ function PlannerContent() {
               <div className="text-xs uppercase font-bold tracking-wider text-on-surface-variant mb-2">
                 Suggested Destinations
               </div>
-              {["Hunza Valley & Gojal", "Skardu & Deosai Plains", "Swat & Kalam Emerald Valleys", "Lahore Walled City & Forts", "Naran & Lake Saiful Malook", "Gwadar Coastal Highway"].map((dest) => (
+              {[
+                "Bahawalpur & Cholistan, Punjab",
+                "Hasilpur, Punjab",
+                "Hunza Valley & Gojal, Gilgit-Baltistan",
+                "Skardu & Deosai Plains, Gilgit-Baltistan",
+                "Swat & Kalam Emerald Valleys, KPK",
+                "Lahore Walled City & Forts, Punjab",
+                "Gwadar & Makran Coastal Highway, Balochistan",
+              ].map((dest) => (
                 <button
                   key={dest}
                   onClick={() => {
                     setDestination(dest);
+                    const loc = findPakistanLocation(dest);
+                    if (loc) setDestinationLocation(loc);
                     setSearchOpen(false);
                   }}
                   className="w-full text-left p-3 rounded-xl hover:bg-surface-container-low transition-colors flex items-center justify-between text-on-surface cursor-pointer"

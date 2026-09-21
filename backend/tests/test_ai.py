@@ -5,10 +5,14 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_ai_chat_unauthenticated(async_client: AsyncClient):
-    """Test that unauthenticated requests to AI assistant are rejected."""
+async def test_ai_chat_guest(async_client: AsyncClient):
+    """Test that guest / unauthenticated requests to AI assistant succeed."""
     res = await async_client.post("/api/v1/ai/chat", json={"message": "Recommend places in Lahore"})
-    assert res.status_code == 401
+    assert res.status_code == 200
+    data = res.json()
+    assert "response" in data
+    assert isinstance(data["sources"], list)
+
 
 
 @pytest.mark.asyncio

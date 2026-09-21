@@ -99,6 +99,7 @@ export default function PlaceDetailPage() {
   const [city, setCity] = useState<City | null>(null);
   const [siblings, setSiblings] = useState<PlaceSummary[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [weatherData, setWeatherData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -128,6 +129,12 @@ export default function PlaceDetailPage() {
         setPlace(placeRes);
         setCity(citiesRes.find((c: City) => c.id === placeRes.city_id) ?? null);
 
+        if (placeRes.city_id) {
+          api.get(`/weather/${placeRes.city_id}`)
+            .then((res) => { if (active) setWeatherData(res.data); })
+            .catch(() => {});
+        }
+
         const [tripList, siblingRes] = await Promise.all([
           tripsApi.list().catch(() => [] as Trip[]),
           placesApi
@@ -156,8 +163,63 @@ export default function PlaceDetailPage() {
 
   const cohort = COHORTS.find((c) => c.key === cohortKey) ?? COHORTS[1];
 
+  const dynamicSeasons = useMemo(() => {
+    const isAlpine =
+      (place?.latitude || 0) > 34.0 ||
+      city?.name?.toLowerCase().includes("hunza") ||
+      city?.name?.toLowerCase().includes("skardu") ||
+      city?.name?.toLowerCase().includes("swat") ||
+      city?.name?.toLowerCase().includes("gilgit");
+
+    if (isAlpine) {
+      return [
+        { name: "Spring (Apr–May)", temp: "8–18°C", best: "Apricot blossoms & thawed streams", volume: 4 },
+        { name: "Summer (Jun–Aug)", temp: "16–28°C", best: "Peak alpine trekking & pass clearance", volume: 5 },
+        { name: "Autumn (Sep–Nov)", temp: "4–16°C", best: "Golden foliage & crystal visibility", volume: 5 },
+        { name: "Winter (Dec–Mar)", temp: "-12–4°C", best: "Snowbound solitude & frozen waterfalls", volume: 2 },
+      ];
+    }
+    return [
+      { name: "Spring (Feb–Mar)", temp: "18–26°C", best: "Gardens blooming, pleasant breezes", volume: 4 },
+      { name: "Summer (Apr–Aug)", temp: "30–42°C", best: "Early morning sightseeing & cold drinks", volume: 2 },
+      { name: "Autumn (Sep–Nov)", temp: "22–32°C", best: "Clear skies & evening dining streets", volume: 5 },
+      { name: "Winter (Dec–Jan)", temp: "10–22°C", best: "Peak heritage season & festival bazaars", volume: 5 },
+    ];
+  }, [place, city]);
+
+  const dynamicGastro = useMemo(() => {
+    const cityName = city?.name || "";
+    if (cityName.toLowerCase().includes("lahore")) {
+      return [
+        { dish: "Lahori Karahi & Barbecue", detail: "Slow-simmered wok spices at Fort Road Food Street" },
+        { dish: "Shahi Tukray & Falooda", detail: "Traditional Mughal royal milk and saffron sweets" },
+        { dish: "Kashmiri Pink Chai", detail: "Cardamom & crushed pistachios at Delhi Gate" },
+      ];
+    }
+    if (cityName.toLowerCase().includes("hunza") || cityName.toLowerCase().includes("gilgit")) {
+      return [
+        { dish: "Hunza Chapshuro", detail: "Crispy wood-baked minced meat & mountain herb pie" },
+        { dish: "Apricot Soup (Chamus)", detail: "Warm sun-dried organic apricot nectar" },
+        { dish: "Gyal & Local Walnut Cake", detail: "Stone-ground wheat crepe with pure apricot kernel oil" },
+      ];
+    }
+    if (cityName.toLowerCase().includes("skardu")) {
+      return [
+        { dish: "Balti Marzan & Trout", detail: "Fresh cold-stream river trout with buckwheat paste" },
+        { dish: "Butter Tea (Poyu Cha)", detail: "Aromatic Himalayan salted butter tea" },
+        { dish: "Mamtu Dumplings", detail: "Steamed spicy mountain meat dumplings with red sauce" },
+      ];
+    }
+    return [
+      { dish: `${cityName || "Regional"} Street Food`, detail: "Evening specialty stalls within walking reach" },
+      { dish: "Slow-Cooked Delicacies", detail: "Local seasonal produce and clay pot specialties" },
+      { dish: "Tea Houses & Roasteries", detail: "Traditional chai and local roasters along the avenue" },
+    ];
+  }, [place, city]);
+
   const baseRate = useMemo(() => {
     if (!place?.estimated_cost_max) return 8400;
+
     return Math.max(2000, Math.round((place.estimated_cost_max * 0.55) / 100) * 100);
   }, [place]);
 
@@ -516,16 +578,40 @@ export default function PlaceDetailPage() {
         </section>
 
         <section className="space-y-4">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
-              Telemetry
-            </p>
-            <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
-              Seasonality Matrix
-            </h2>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
+                Telemetry
+              </p>
+              <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
+                Seasonality & Climate Matrix
+              </h2>
+            </div>
+            {weatherData && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container border border-outline-variant/60 text-xs font-semibold text-on-surface">
+                <span className="material-symbols-outlined text-secondary text-base">thermostat</span>
+                <span>{weatherData.temperature_celsius}°C</span>
+                <span className="text-on-surface-variant font-normal">· {weatherData.condition}</span>
+                <span className="text-emerald-700 font-mono text-[11px] font-bold">({weatherData.humidity_percent}% humidity)</span>
+              </div>
+            )}
           </div>
+          {weatherData?.alert && (
+            <div className="p-3.5 rounded-xl bg-secondary-container/40 border border-secondary/30 text-xs text-on-surface flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-secondary text-base shrink-0 mt-0.5">info</span>
+              <div>
+                <span className="font-bold text-secondary">Local Advisory: </span>
+                <span>{weatherData.alert}</span>
+                {weatherData.pass_clearance && (
+                  <span className="block mt-1 font-mono text-[11px] text-on-surface-variant font-medium">
+                    Route Clearance: {weatherData.pass_clearance}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {SEASONS.map((s) => (
+            {dynamicSeasons.map((s) => (
               <SeasonCard key={s.name} {...s} />
             ))}
           </div>
@@ -680,11 +766,12 @@ export default function PlaceDetailPage() {
                 </div>
               </div>
               <div className="space-y-3">
-                {GASTRO.map((g) => (
+                {dynamicGastro.map((g) => (
                   <DishRow key={g.dish} {...g} />
                 ))}
               </div>
             </div>
+
 
             <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2">

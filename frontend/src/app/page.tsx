@@ -284,6 +284,71 @@ const MAP_WAYPOINTS: Record<string, MapWaypoint> = {
   },
 };
 
+interface DayPreview {
+  cityId: string;
+  title: string;
+  estSpend: string;
+  stops: {
+    time: string;
+    place: string;
+    desc: string;
+    tag: string;
+  }[];
+}
+
+const DESTINATION_DAY_PREVIEWS: Record<string, DayPreview> = {
+  hunza: {
+    cityId: "gilgit",
+    title: "Karakoram Valley & Royal Forts",
+    estSpend: "Rs. 12,500",
+    stops: [
+      { time: "09:00 AM", place: "Baltit & Altit Forts", desc: "700-yr Silk Road royal citadel", tag: "Heritage" },
+      { time: "13:00 PM", place: "Attabad Lake Boating", desc: "Turquoise glacial waters & tunnel", tag: "Nature" },
+      { time: "16:30 PM", place: "Passu Cones Golden Hour", desc: "Cathedral peaks sunset viewpoint", tag: "Photography" },
+    ],
+  },
+  skardu: {
+    cityId: "skardu",
+    title: "Alpine Lakes & High Plateaus",
+    estSpend: "Rs. 15,000",
+    stops: [
+      { time: "08:30 AM", place: "Shangrila & Kachura Lake", desc: "Pagoda resort & mirror waters", tag: "Scenic" },
+      { time: "12:00 PM", place: "Katpana Cold Desert", desc: "High-altitude sand dunes beneath snow", tag: "Adventure" },
+      { time: "15:30 PM", place: "Sadpara Lake & Dam", desc: "Turquoise reservoir & Karakoram peaks", tag: "Nature" },
+    ],
+  },
+  islamabad: {
+    cityId: "islamabad",
+    title: "Margalla Foothills & Modernist Culture",
+    estSpend: "Rs. 7,500",
+    stops: [
+      { time: "09:00 AM", place: "Faisal Mosque", desc: "Modernist Bedouin tent marble architecture", tag: "Architecture" },
+      { time: "12:30 PM", place: "Lok Virsa Heritage Museum", desc: "National ethnographic pavilions", tag: "Culture" },
+      { time: "17:00 PM", place: "Monal Margalla Hills", desc: "Sunset panorama over federal capital", tag: "Gastronomy" },
+    ],
+  },
+  karachi: {
+    cityId: "karachi",
+    title: "Arabian Sea Coast & Colonial Heritage",
+    estSpend: "Rs. 8,200",
+    stops: [
+      { time: "09:30 AM", place: "Mohatta Palace & Gardens", desc: "Rajasthan pink stone architecture", tag: "Heritage" },
+      { time: "13:30 PM", place: "Burns Road Food Street", desc: "Historic authentic street gastronomy", tag: "Food" },
+      { time: "17:00 PM", place: "Clifton Beach & Manora Island", desc: "Sunset ocean breeze & camel rides", tag: "Coastal" },
+    ],
+  },
+  lahore: {
+    cityId: "lahore",
+    title: "Mughal Heritage & Royal Flavors",
+    estSpend: "Rs. 6,200",
+    stops: [
+      { time: "09:00 AM", place: "Lahore Fort", desc: "Sheesh Mahal mirrors & Mughal royal art", tag: "Mughal" },
+      { time: "12:30 PM", place: "Badshahi Mosque", desc: "Grand red sandstone courtyard", tag: "Heritage" },
+      { time: "14:00 PM", place: "Haveli Rooftop Restaurant", desc: "Mughlai Karahi overlooking Badshahi", tag: "Food" },
+    ],
+  },
+};
+
 export default function HomePage() {
   const [activeVibes, setActiveVibes] = useState<string[]>([
     "nature",
@@ -488,6 +553,19 @@ export default function HomePage() {
   });
 
   const activeWaypoint = MAP_WAYPOINTS[activeMapId] || MAP_WAYPOINTS["lahore"];
+
+  // Derive active destination key for Day 1 preview based on user input or map selection
+  const activeDestKey = (() => {
+    const inputLower = (heroAiInput || "").toLowerCase();
+    if (inputLower.includes("hunza") || inputLower.includes("passu") || inputLower.includes("gilgit") || inputLower.includes("apricot")) return "hunza";
+    if (inputLower.includes("skardu") || inputLower.includes("deosai") || inputLower.includes("kachura")) return "skardu";
+    if (inputLower.includes("islamabad") || inputLower.includes("margalla") || inputLower.includes("monal")) return "islamabad";
+    if (inputLower.includes("karachi") || inputLower.includes("coast") || inputLower.includes("gwadar") || inputLower.includes("beach")) return "karachi";
+    if (inputLower.includes("lahore") || inputLower.includes("mughal") || inputLower.includes("food tour")) return "lahore";
+    return activeMapId || "lahore";
+  })();
+
+  const currentDayPreview = DESTINATION_DAY_PREVIEWS[activeDestKey] || DESTINATION_DAY_PREVIEWS["lahore"];
 
   const filteredFaqs = FAQS.filter(
     (item) => selectedFaqCategory === "all" || item.category === selectedFaqCategory
@@ -1061,40 +1139,47 @@ export default function HomePage() {
                             Day 1
                           </span>
                           <span className="font-display text-sm font-bold text-on-surface">
-                            Mughal Heritage &amp; Royal Flavors
+                            {currentDayPreview.title}
                           </span>
                         </div>
-                        <span className="text-xs text-on-surface-variant font-mono">
-                          Est. Spend: Rs. 6,200
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-on-surface-variant font-mono">
+                            Est. Spend: {currentDayPreview.estSpend}
+                          </span>
+                          <Link
+                            href={`/planner`}
+                            className="text-xs text-secondary hover:underline font-bold flex items-center gap-1"
+                          >
+                            <span>Planner</span>
+                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                          </Link>
+                        </div>
                       </div>
 
                       {/* Stepper Timeline */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                        <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 shadow-subtle flex flex-col gap-1">
-                          <div className="flex items-center gap-1 text-secondary text-xs font-bold font-mono">
-                            <span className="material-symbols-outlined text-sm">schedule</span>
-                            <span>09:00 AM</span>
+                        {currentDayPreview.stops.map((stop, sIdx) => (
+                          <div
+                            key={sIdx}
+                            className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 shadow-subtle flex flex-col gap-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 text-secondary text-xs font-bold font-mono">
+                                <span className="material-symbols-outlined text-sm">schedule</span>
+                                <span>{stop.time}</span>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] font-medium text-on-surface-variant">
+                                {stop.tag}
+                              </span>
+                            </div>
+                            <span className="font-display text-xs font-bold text-on-surface truncate">
+                              {stop.place}
+                            </span>
+                            <span className="text-[11px] text-on-surface-variant line-clamp-1">
+                              {stop.desc}
+                            </span>
                           </div>
-                          <span className="font-display text-xs font-bold text-on-surface">Lahore Fort</span>
-                          <span className="text-[11px] text-on-surface-variant">Sheesh Mahal mirrors</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 shadow-subtle flex flex-col gap-1">
-                          <div className="flex items-center gap-1 text-secondary text-xs font-bold font-mono">
-                            <span className="material-symbols-outlined text-sm">schedule</span>
-                            <span>12:30 PM</span>
-                          </div>
-                          <span className="font-display text-xs font-bold text-on-surface">Badshahi Mosque</span>
-                          <span className="text-[11px] text-on-surface-variant">Sandstone courtyard</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 shadow-subtle flex flex-col gap-1">
-                          <div className="flex items-center gap-1 text-secondary text-xs font-bold font-mono">
-                            <span className="material-symbols-outlined text-sm">schedule</span>
-                            <span>14:00 PM</span>
-                          </div>
-                          <span className="font-display text-xs font-bold text-on-surface">Haveli Restaurant</span>
-                          <span className="text-[11px] text-on-surface-variant">Mughlai Karahi &amp; rooftop</span>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </div>
