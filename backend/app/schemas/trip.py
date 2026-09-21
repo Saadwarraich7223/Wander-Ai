@@ -77,6 +77,7 @@ class TripResponse(BaseResponse):
     duration_days: int
     total_budget: float
     pace: str
+    status: str = "planning"
     start_date: date | None
     preferences: dict[str, Any] | None = None
     active_itinerary: ItineraryResponse | None
@@ -97,4 +98,26 @@ class AddStopRequest(BaseModel):
 
     place_id: uuid.UUID
     preferred_day_number: int | None = Field(None, ge=1, le=14)
+
+
+class TripStatusUpdateRequest(BaseModel):
+    """Payload to update trip status lifecycle."""
+
+    status: str = Field(..., pattern=r"^(planning|active|completed|cancelled)$")
+
+
+class TripCheckInRequest(BaseModel):
+    """Payload to toggle visited status of an itinerary stop."""
+
+    item_id: uuid.UUID
+    is_visited: bool = True
+
+
+class TripExpenseLogRequest(BaseModel):
+    """Payload to record an in-trip actual expense."""
+
+    category: str = Field("General", min_length=1, max_length=50)
+    amount: float = Field(..., ge=0.0)
+    notes: str = Field("", max_length=255)
+    day_number: int | None = None
 

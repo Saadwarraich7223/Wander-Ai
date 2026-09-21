@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tripsApi, aiApi, placesApi, getErrorMessage } from "@/lib/api";
-import { Trip, ItineraryDay, ItineraryItem, PlaceSummary } from "@/types";
+import { Trip, ItineraryDay, ItineraryItem, PlaceSummary, TripExpense } from "@/types";
 import Navbar from "@/components/Navbar";
 import {
   findPakistanLocation,
@@ -36,11 +36,31 @@ function calculateHaversineDistanceKm(
 export default function TripDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tripId = params.id as string;
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // In-Trip Live Companion & Check-in states
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  const [checkingInStopId, setCheckingInStopId] = useState<string | null>(null);
+
+  // Expense Logger states
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseCategory, setExpenseCategory] = useState<string>("Dining");
+  const [expenseAmount, setExpenseAmount] = useState<number | "">("");
+  const [expenseNotes, setExpenseNotes] = useState<string>("");
+  const [expenseDay, setExpenseDay] = useState<number | null>(null);
+  const [expenseLogging, setExpenseLogging] = useState(false);
+
+  // Interactive Leaflet Map refs & states
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const leafletMapRef = useRef<any>(null);
+  const markersRef = useRef<Record<string, any>>({});
+  const polylineRef = useRef<any>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   // Stop removal & addition states
   const [deletingStopId, setDeletingStopId] = useState<string | null>(null);
@@ -110,6 +130,10 @@ export default function TripDetailPage() {
       setNewPace(data.pace as "relaxed" | "moderate" | "packed");
       setNewDuration(data.duration_days);
 
+      if (data.status === "active" || searchParams.get("mode") === "live") {
+        setIsLiveMode(true);
+      }
+
       // Expand first day by default
       if (data.active_itinerary?.days && data.active_itinerary.days.length > 0) {
         setExpandedDays(new Set([data.active_itinerary.days[0].day_number]));
@@ -121,6 +145,61 @@ export default function TripDetailPage() {
     }
   };
 
+  const handleStatusChange = async (newStatus: "planning" | "active" | "completed") => {
+    try {
+      const updated = await tripsApi.updateStatus(tripId, newStatus);
+      setTrip(updated);
+      if (newStatus === "active") {
+        setIsLiveMode(true);
+      }
+    } catch (err: any) {
+      alert(getErrorMessage(err, "Failed to update trip status"));
+    }
+  };
+
+  const handleToggleCheckIn = async (itemId: string, currentVisited: boolean) => {
+    try {
+      setCheckingInStopId(itemId);
+      const updated = await tripsApi.toggleCheckIn(tripId, itemId, !currentVisited);
+      setTrip(updated);
+    } catch (err: any) {
+      alert(getErrorMessage(err, "Failed to update check-in status"));
+    } finally {
+      setCheckingInStopId(null);
+    }
+  };
+
+  const handleLogExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expenseAmount || Number(expenseAmount) <= 0) return;
+    try {
+      setExpenseLogging(true);
+      const updated = await tripsApi.logExpense(tripId, {
+        category: expenseCategory,
+        amount: Number(expenseAmount),
+        notes: expenseNotes,
+        day_number: expenseDay || undefined,
+      });
+      setTrip(updated);
+      setExpenseAmount("");
+      setExpenseNotes("");
+      setShowExpenseModal(false);
+    } catch (err: any) {
+      alert(getErrorMessage(err, "Failed to log expense"));
+    } finally {
+      setExpenseLogging(false);
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      const updated = await tripsApi.deleteExpense(tripId, expenseId);
+      setTrip(updated);
+    } catch (err: any) {
+      alert(getErrorMessage(err, "Failed to delete expense"));
+    }
+  };
+
   const toggleDayExpansion = (dayNumber: number) => {
     const next = new Set(expandedDays);
     if (next.has(dayNumber)) {
@@ -129,6 +208,22 @@ export default function TripDetailPage() {
       next.add(dayNumber);
     }
     setExpandedDays(next);
+  };
+
+  const handleCompleteDayAndAdvance = async (dayNumber: number, dayItems: ItineraryItem[]) => {
+    try {
+      for (const item of dayItems) {
+        if (!visitedStopsSet.has(item.id)) {
+          await tripsApi.toggleCheckIn(tripId, item.id, true);
+        }
+      }
+      const updated = await tripsApi.getById(tripId);
+      setTrip(updated);
+      const nextDayNum = dayNumber + 1;
+      setExpandedDays((prev) => new Set([...prev, nextDayNum]));
+    } catch (err: any) {
+      alert("Failed to complete day: " + getErrorMessage(err, "Could not advance day"));
+    }
   };
 
   const handleDeleteTrip = async () => {
@@ -233,7 +328,7 @@ export default function TripDetailPage() {
     setTimeout(() => {
       setSwapUpdating(false);
       setSwapModalOpen(false);
-      alert("✨ Afternoon itinerary re-synthesized for gentle cultural pacing!");
+      alert("Afternoon itinerary re-synthesized for gentle cultural pacing!");
     }, 600);
   };
 
@@ -459,6 +554,168 @@ export default function TripDetailPage() {
     });
   }, [modalScopeFilter, destinationCandidatePlaces, unscheduledPlacesWithDist, placeCategoryFilter, placeSearchQuery]);
 
+  const activeItinerary = trip?.active_itinerary;
+  const days = activeItinerary?.days || [];
+  const totalCost = activeItinerary?.total_cost || trip?.total_budget || 0;
+  const totalPlaces = days.reduce((acc, d) => acc + d.items.length, 0);
+
+  // Visited stops set
+  const visitedStopsSet = useMemo(() => {
+    return new Set<string>((trip?.preferences?.visited_stops || []).map(String));
+  }, [trip?.preferences?.visited_stops]);
+
+  // All scheduled stops across all days
+  const allScheduledItems = useMemo(() => {
+    const items: { dayNum: number; item: ItineraryItem }[] = [];
+    if (days.length > 0) {
+      for (const d of days) {
+        for (const it of d.items) {
+          items.push({ dayNum: d.day_number, item: it });
+        }
+      }
+    }
+    return items;
+  }, [days]);
+
+  const totalStopsCount = allScheduledItems.length;
+  const visitedStopsCount = allScheduledItems.filter(({ item }) => visitedStopsSet.has(item.id)).length;
+  const progressPercent = totalStopsCount > 0 ? Math.round((visitedStopsCount / totalStopsCount) * 100) : 0;
+
+  // In-Trip Live Next Up Sentinel
+  const firstUnvisited = allScheduledItems.find(({ item }) => !visitedStopsSet.has(item.id));
+  const nextUnvisitedIndex = allScheduledItems.findIndex(({ item }) => !visitedStopsSet.has(item.id));
+  const secondUnvisited = nextUnvisitedIndex >= 0 && nextUnvisitedIndex + 1 < allScheduledItems.length ? allScheduledItems[nextUnvisitedIndex + 1] : null;
+
+  const currentStop = firstUnvisited ? firstUnvisited.item : allScheduledItems[0]?.item;
+  const currentDayNum = firstUnvisited ? firstUnvisited.dayNum : 1;
+  const nextStop = secondUnvisited ? secondUnvisited.item : null;
+  const nextStopDayNum = secondUnvisited ? secondUnvisited.dayNum : null;
+
+  // 5-Pillar Budget Engine
+  const budgetBreakdown = useMemo(() => {
+    const total = trip?.total_budget || 50000;
+    return {
+      stays: Math.round(total * 0.40),
+      transit: Math.round(total * 0.25),
+      meals: Math.round(total * 0.20),
+      activities: Math.round(total * 0.10),
+      contingency: Math.round(total * 0.05),
+    };
+  }, [trip?.total_budget]);
+
+  const loggedExpenses = useMemo(() => {
+    return (trip?.preferences?.expenses || []) as TripExpense[];
+  }, [trip?.preferences?.expenses]);
+
+  const totalExpensesLogged = useMemo(() => {
+    return loggedExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  }, [loggedExpenses]);
+
+  const remainingBudget = Math.max(0, (trip?.total_budget || 50000) - totalExpensesLogged);
+  const budgetUsedPercent = Math.min(100, Math.round((totalExpensesLogged / (trip?.total_budget || 50000)) * 100));
+
+  // Leaflet Map Initialization
+  useEffect(() => {
+    if (typeof window === "undefined" || !mapContainerRef.current) return;
+    if (leafletMapRef.current) return;
+
+    import("leaflet").then((L) => {
+      if (!mapContainerRef.current || leafletMapRef.current) return;
+      const map = L.map(mapContainerRef.current, {
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([destLoc.latitude, destLoc.longitude], 12);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+      }).addTo(map);
+
+      leafletMapRef.current = map;
+      setMapReady(true);
+    });
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, [destLoc.latitude, destLoc.longitude]);
+
+  // Leaflet Markers and Polyline Trails
+  useEffect(() => {
+    if (!leafletMapRef.current || !mapReady) return;
+
+    import("leaflet").then((L) => {
+      const map = leafletMapRef.current;
+      if (!map) return;
+
+      // Clear existing markers
+      Object.values(markersRef.current).forEach((m: any) => m.remove());
+      markersRef.current = {};
+      if (polylineRef.current) {
+        polylineRef.current.remove();
+        polylineRef.current = null;
+      }
+
+      const latLngs: [number, number][] = [];
+      let orderCounter = 1;
+
+      days.forEach((day) => {
+        day.items.forEach((item) => {
+          if (typeof item.place.latitude === "number" && typeof item.place.longitude === "number") {
+            const lat = item.place.latitude;
+            const lng = item.place.longitude;
+            latLngs.push([lat, lng]);
+
+            const isVisited = visitedStopsSet.has(item.id);
+            const iconHtml = `
+              <div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:${isVisited ? "#059669" : "#186a57"};color:#ffffff;font-weight:bold;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.3);border:2px solid #ffffff;cursor:pointer;">
+                ${isVisited ? "✓" : orderCounter}
+              </div>
+            `;
+
+            const customIcon = L.divIcon({
+              html: iconHtml,
+              className: "custom-stop-marker",
+              iconSize: [30, 30],
+              iconAnchor: [15, 15],
+            });
+
+            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+            marker.bindPopup(`
+              <div style="font-family:sans-serif;min-width:180px;padding:4px;">
+                <strong style="font-size:13px;color:#111;">${item.place.name}</strong><br/>
+                <span style="font-size:11px;color:#666;">Day ${day.day_number} · ${item.start_time || "09:00"} - ${item.end_time || "10:30"}</span><br/>
+                <div style="margin-top:8px;">
+                  <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:4px 8px;background:#186a57;color:#fff;font-size:10px;font-weight:bold;border-radius:6px;text-decoration:none;">
+                    Navigate in Google Maps ↗
+                  </a>
+                </div>
+              </div>
+            `);
+
+            markersRef.current[item.id] = marker;
+            orderCounter++;
+          }
+        });
+      });
+
+      if (latLngs.length > 1) {
+        const poly = L.polyline(latLngs, {
+          color: "#186a57",
+          weight: 3,
+          dashArray: "6, 8",
+          opacity: 0.8,
+        }).addTo(map);
+        polylineRef.current = poly;
+        map.fitBounds(poly.getBounds(), { padding: [30, 30] });
+      } else if (latLngs.length === 1) {
+        map.setView(latLngs[0], 13);
+      }
+    });
+  }, [days, mapReady, visitedStopsSet]);
+
   if (loading) {
     return (
       <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
@@ -542,11 +799,6 @@ export default function TripDetailPage() {
     );
   }
 
-  const activeItinerary = trip.active_itinerary;
-  const days = activeItinerary?.days || [];
-  const totalCost = activeItinerary?.total_cost || trip.total_budget;
-  const totalPlaces = days.reduce((acc, d) => acc + d.items.length, 0);
-
   return (
     <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
 
@@ -591,6 +843,20 @@ export default function TripDetailPage() {
                     <span className="px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-semibold capitalize">
                       {trip.pace} Pace
                     </span>
+                    {trip.status === "active" ? (
+                      <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        Live Expedition
+                      </span>
+                    ) : trip.status === "completed" ? (
+                      <span className="px-3 py-1 rounded-full bg-purple-500/15 text-purple-700 text-xs font-bold">
+                        Completed
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-semibold">
+                        Planning
+                      </span>
+                    )}
                     <span className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-semibold">
                       {destInterests.categoryBadge}
                     </span>
@@ -604,59 +870,299 @@ export default function TripDetailPage() {
                 </div>
 
                 {/* Action Bar */}
-                <div className="flex flex-wrap items-center gap-unit-2">
-                  <button className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60" type="button">
-                    <span className="material-symbols-outlined text-base">bookmark_add</span>
-                    <span>Save Trip</span>
-                  </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {trip.status === "planning" || !trip.status ? (
+                    <button
+                      onClick={() => handleStatusChange("active")}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold shadow-sm transition-colors cursor-pointer border border-transparent"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-base">play_arrow</span>
+                      <span>Start Expedition</span>
+                    </button>
+                  ) : trip.status === "active" ? (
+                    <>
+                      <button
+                        onClick={() => setIsLiveMode(!isLiveMode)}
+                        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer border ${
+                          isLiveMode
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700 border-transparent"
+                            : "bg-surface-container-low text-emerald-800 hover:bg-surface-container border-outline-variant/60"
+                        }`}
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-base">navigation</span>
+                        <span>{isLiveMode ? "Live HUD Active" : "Live HUD"}</span>
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange("completed")}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-base text-secondary">check_circle</span>
+                        <span>Mark Completed</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleStatusChange("planning")}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-base">replay</span>
+                      <span>Reopen Plan</span>
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => setAiDrawerOpen(true)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface text-on-surface hover:bg-surface-container-high text-xs font-semibold shadow-sm transition-all cursor-pointer border border-outline-variant/60"
+                    onClick={() => setShowExpenseModal(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
-                    <span className="text-xs">✨</span>
+                    <span className="material-symbols-outlined text-base text-secondary">payments</span>
+                    <span>Expense</span>
+                  </button>
+
+                  <button
+                    onClick={() => setAiDrawerOpen(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-base text-secondary">auto_awesome</span>
                     <span>Edit with AI</span>
                   </button>
-                  <button className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60" type="button">
-                    <span className="material-symbols-outlined text-base">ios_share</span>
-                    <span>Share</span>
-                  </button>
+
                   <button
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base">picture_as_pdf</span>
                     <span>PDF</span>
                   </button>
+
                   {activeItinerary && (
                     <Link
                       href={`/explore?trip_id=${trip.id}`}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary text-on-secondary hover:bg-secondary-dark text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     >
-                      <span className="material-symbols-outlined text-base">map</span>
+                      <span className="material-symbols-outlined text-base text-secondary">map</span>
                       <span>Smart Map</span>
                     </Link>
                   )}
-                  <button
-                    onClick={handleDeleteTrip}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-red-600 hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-base">delete</span>
-                    <span>Delete</span>
-                  </button>
+
                   <button
                     onClick={() => setShowReoptimize(true)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base text-secondary">refresh</span>
                     <span>Reoptimize</span>
                   </button>
+
+                  <button
+                    onClick={handleDeleteTrip}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-base">delete</span>
+                    <span>Delete</span>
+                  </button>
                 </div>
               </div>
             </div>
+
+            {/* Live Expedition Companion HUD (When in Live Mode or Active Status) */}
+            {(isLiveMode || trip.status === "active") && (
+              <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-luxury border-2 border-emerald-500/40 mb-6 relative overflow-hidden bg-gradient-to-br from-emerald-500/5 via-surface-container-lowest to-secondary/5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                      <span className="material-symbols-outlined text-2xl animate-pulse">navigation</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                          Live Expedition Sentinel
+                        </span>
+                        <span className="text-xs text-outline font-mono">
+                          {visitedStopsCount === totalStopsCount && totalStopsCount > 0
+                            ? `Completed All ${totalStopsCount} Stops`
+                            : `Active Waypoint: Day ${currentDayNum} of ${trip.duration_days}`}
+                        </span>
+                        {currentDayNum > 1 && visitedStopsCount < totalStopsCount && (
+                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/25">
+                            Day {currentDayNum - 1} Complete
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-display font-bold text-base sm:text-lg text-on-surface mt-0.5">
+                        {visitedStopsCount === totalStopsCount && totalStopsCount > 0
+                          ? "All Scheduled Stops Completed"
+                          : currentStop
+                          ? `Current Objective: ${currentStop.place.name}`
+                          : "Expedition in Progress"}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Progress & Quick Actions */}
+                  <div className="flex items-center gap-2.5 self-start md:self-auto">
+                    <button
+                      onClick={() => setShowExpenseModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition shadow-2xs cursor-pointer"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-sm text-secondary">payments</span>
+                      <span>+ Log Expense</span>
+                    </button>
+                    {trip.status !== "completed" && (
+                      <button
+                        onClick={() => handleStatusChange("completed")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 text-xs font-bold border border-purple-500/30 transition shadow-2xs cursor-pointer"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-sm">check_circle</span>
+                        <span>Complete Trip</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="py-3.5 border-b border-outline-variant/40">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-semibold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-emerald-600">tour</span>
+                      <span>Progress: {visitedStopsCount} of {totalStopsCount} stops explored</span>
+                    </span>
+                    <span className="font-mono font-bold text-emerald-700">{progressPercent}%</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-surface-container-high rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-secondary rounded-full transition-all duration-500"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Active Waypoint Card & Next Stop Preview */}
+                {visitedStopsCount === totalStopsCount && totalStopsCount > 0 ? (
+                  <div className="pt-4">
+                    <div className="p-5 rounded-2xl bg-surface-container-low/90 border border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-emerald-500/20 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                          <span className="material-symbols-outlined text-2xl">verified</span>
+                        </div>
+                        <div>
+                          <h4 className="font-display font-bold text-base text-on-surface">
+                            All {totalStopsCount} Scheduled Waypoints Completed
+                          </h4>
+                          <p className="text-xs text-on-surface-variant mt-0.5">
+                            You have explored every stop across your {days.length}-day journey!
+                          </p>
+                        </div>
+                      </div>
+                      {trip.status !== "completed" && (
+                        <button
+                          onClick={() => handleStatusChange("completed")}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold transition-all shadow-sm shrink-0 cursor-pointer"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-base">check_circle</span>
+                          <span>Mark Expedition Completed</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : currentStop && (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-4 items-center">
+                    <div className="md:col-span-7 bg-surface-container-low/80 rounded-xl p-4 border border-outline-variant/50 flex flex-col justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary bg-secondary/10 px-2 py-0.5 rounded">
+                            Day {currentDayNum} Waypoint
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">
+                            {currentStop.place.category?.name || "Attraction"}
+                          </span>
+                          <span className="font-mono text-xs font-semibold text-secondary">
+                            {currentStop.start_time || "09:00 AM"} – {currentStop.end_time || "10:30 AM"}
+                          </span>
+                          <span className="text-[11px] text-outline font-mono">
+                            ({currentStop.visit_duration_minutes} min visit)
+                          </span>
+                        </div>
+                        <h4 className="font-display font-extrabold text-base text-on-surface">
+                          {currentStop.place.name}
+                        </h4>
+                        <p className="text-xs text-on-surface-variant line-clamp-1 mt-0.5">
+                          {currentStop.notes || currentStop.place.description || `Verified waypoint located in ${destLoc.name}`}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-outline-variant/30">
+                        <a
+                          href={
+                            typeof currentStop.place.latitude === "number" && typeof currentStop.place.longitude === "number"
+                              ? `https://www.google.com/maps/dir/?api=1&destination=${currentStop.place.latitude},${currentStop.place.longitude}`
+                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentStop.place.name + " " + destLoc.name)}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold transition shadow-xs cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">directions</span>
+                          <span>Start GPS Navigation</span>
+                        </a>
+
+                        <button
+                          disabled={checkingInStopId === currentStop.id}
+                          onClick={() => handleToggleCheckIn(currentStop.id, visitedStopsSet.has(currentStop.id))}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition shadow-xs cursor-pointer disabled:opacity-50"
+                          type="button"
+                        >
+                          {checkingInStopId === currentStop.id ? (
+                            <span className="w-3.5 h-3.5 border-2 border-secondary/40 border-t-secondary rounded-full animate-spin" />
+                          ) : (
+                            <span className="material-symbols-outlined text-base text-secondary">check_circle</span>
+                          )}
+                          <span>Mark Day {currentDayNum} Stop Visited</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Next Up Stop Card */}
+                    <div className="md:col-span-5 bg-surface-container-low/50 rounded-xl p-4 border border-outline-variant/40 flex flex-col justify-between h-full">
+                      <div>
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-bold block mb-1">
+                          {nextStopDayNum && nextStopDayNum !== currentDayNum ? `Next Up (Day ${nextStopDayNum})` : "Next Up in Sequence"}
+                        </span>
+                        {nextStop ? (
+                          <>
+                            <h5 className="font-display font-bold text-sm text-on-surface">
+                              {nextStop.place.name}
+                            </h5>
+                            <p className="text-xs text-on-surface-variant line-clamp-1 mt-0.5">
+                              {nextStop.visit_duration_minutes} min • {nextStop.place.category?.name || "Spot"}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-on-surface-variant">
+                            This is the final scheduled waypoint in your active itinerary!
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-2 text-[11px] text-outline font-mono">
+                        Auto-sequenced via Route Optimizer
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Departure Origin Vector Card */}
             <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm mb-6 border border-secondary/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-secondary/5 via-surface-container-lowest to-transparent">
@@ -749,6 +1255,8 @@ export default function TripDetailPage() {
                   days.map((day) => {
                     const isExpanded = expandedDays.has(day.day_number);
                     const dayStops = day.items.length;
+                    const isDayAllVisited = day.items.length > 0 && day.items.every((it) => visitedStopsSet.has(it.id));
+                    const visitedInDay = day.items.filter((it) => visitedStopsSet.has(it.id)).length;
                     const dayDistance = day.items.reduce((acc, it) => acc + (it.travel_distance_from_prev_km || 0), 0);
 
                     return (
@@ -767,11 +1275,19 @@ export default function TripDetailPage() {
                               </span>
                             </div>
                             <div>
-                              <h2 className="font-display font-bold text-base text-on-surface">
-                                {day.date
-                                  ? `Day ${day.day_number} — ${new Date(day.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
-                                  : `Day ${day.day_number} — ${destLoc.name} Circuit`}
-                              </h2>
+                              <div className="flex items-center gap-2">
+                                <h2 className="font-display font-bold text-base text-on-surface">
+                                  {day.date
+                                    ? `Day ${day.day_number} — ${new Date(day.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
+                                    : `Day ${day.day_number} — ${destLoc.name} Circuit`}
+                                </h2>
+                                {isDayAllVisited && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 text-[10px] font-bold border border-emerald-500/25">
+                                    <span className="material-symbols-outlined !text-[12px]">check_circle</span>
+                                    <span>Completed</span>
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-on-surface-variant">
                                 {day.items[0]?.place.name ? `${day.items[0].place.name} & regional exploration` : `${destLoc.name} landmarks & cultural stops`}
                               </p>
@@ -780,7 +1296,8 @@ export default function TripDetailPage() {
 
                           <div className="flex items-center gap-unit-3 self-start sm:self-auto">
                             <span className="px-3 py-1 rounded-full bg-surface-container-high text-xs font-semibold text-on-surface">
-                              {dayStops} stop{dayStops !== 1 ? 's' : ''} {dayDistance > 0 ? `• ${dayDistance.toFixed(1)} km` : ''}
+                              {visitedInDay > 0 ? `${visitedInDay}/${dayStops} visited` : `${dayStops} stop${dayStops !== 1 ? 's' : ''}`}
+                              {dayDistance > 0 ? ` • ${dayDistance.toFixed(1)} km` : ''}
                             </span>
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleDayExpansion(day.day_number); }}
@@ -928,24 +1445,38 @@ export default function TripDetailPage() {
                                     const iconName = getItemIcon(item);
                                     const isLast = idx === day.items.length - 1;
                                     const isDeleting = deletingStopId === item.id;
+                                    const isVisited = visitedStopsSet.has(item.id);
+                                    const isChecking = checkingInStopId === item.id;
 
                                     return (
                                       <div key={item.id} className="flex flex-col">
 
                                         {/* Item Card */}
                                         <div className="relative flex items-start gap-4 group">
-                                          <div className="w-8 h-8 rounded-full bg-surface-container-lowest border border-secondary/30 text-secondary shadow-sm flex items-center justify-center z-10 shrink-0">
-                                            <span className="material-symbols-outlined text-base">{iconName}</span>
+                                          <div className={`w-8 h-8 rounded-full border shadow-sm flex items-center justify-center z-10 shrink-0 transition-colors ${
+                                            isVisited
+                                              ? "bg-emerald-500 border-emerald-600 text-white"
+                                              : "bg-surface-container-lowest border-secondary/30 text-secondary"
+                                          }`}>
+                                            <span className="material-symbols-outlined text-base">
+                                              {isVisited ? "check" : iconName}
+                                            </span>
                                           </div>
 
-                                          <div className="flex-1 bg-surface-container-low border border-outline-variant/50 hover:bg-surface-container-high/70 rounded-xl p-4 transition-all shadow-xs">
+                                          <div className={`flex-1 border rounded-xl p-4 transition-all shadow-xs ${
+                                            isVisited
+                                              ? "bg-surface-container-lowest/80 border-emerald-500/30 opacity-90"
+                                              : "bg-surface-container-low border-outline-variant/50 hover:bg-surface-container-high/70"
+                                          }`}>
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
                                               <div className="flex items-center gap-2.5">
                                                 <span className="font-mono text-xs font-bold text-secondary">
                                                   {item.start_time || "09:00 AM"}
                                                 </span>
                                                 <span className="w-1 h-1 rounded-full bg-outline" />
-                                                <h3 className="font-display font-semibold text-sm sm:text-base text-on-surface">
+                                                <h3 className={`font-display font-semibold text-sm sm:text-base ${
+                                                  isVisited ? "text-on-surface line-through decoration-emerald-500/60" : "text-on-surface"
+                                                }`}>
                                                   {item.place.name}
                                                 </h3>
                                               </div>
@@ -991,7 +1522,7 @@ export default function TripDetailPage() {
                                               </div>
                                             )}
 
-                                            <div className="flex items-center justify-between pt-1">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-outline-variant/30">
                                               <div className="flex items-center gap-2">
                                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-on-surface px-2 py-0.5 rounded bg-surface-container-highest border border-outline-variant/40">
                                                   <span className="material-symbols-outlined text-xs text-secondary">verified</span>
@@ -1004,7 +1535,45 @@ export default function TripDetailPage() {
                                                 )}
                                               </div>
 
-                                              <div className="flex items-center gap-2">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                {/* Check-in Toggle Button */}
+                                                <button
+                                                  onClick={() => handleToggleCheckIn(item.id, isVisited)}
+                                                  disabled={isChecking}
+                                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                                    isVisited
+                                                      ? "bg-emerald-500/15 text-emerald-800 border border-emerald-500/30 hover:bg-emerald-500/25"
+                                                      : "bg-surface-container text-on-surface-variant hover:text-emerald-800 hover:bg-emerald-500/10 border border-outline-variant/60"
+                                                  }`}
+                                                  type="button"
+                                                  title={isVisited ? "Mark as unvisited" : "Check in / Mark visited"}
+                                                >
+                                                  {isChecking ? (
+                                                    <span className="w-3 h-3 border-2 border-emerald-600/40 border-t-emerald-600 rounded-full animate-spin" />
+                                                  ) : (
+                                                    <span className="material-symbols-outlined text-sm">
+                                                      {isVisited ? "check_circle" : "radio_button_unchecked"}
+                                                    </span>
+                                                  )}
+                                                  <span>{isVisited ? "Visited" : "Check In"}</span>
+                                                </button>
+
+                                                {/* Google Maps Directions */}
+                                                <a
+                                                  href={
+                                                    typeof item.place.latitude === "number" && typeof item.place.longitude === "number"
+                                                      ? `https://www.google.com/maps/dir/?api=1&destination=${item.place.latitude},${item.place.longitude}`
+                                                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.place.name + " " + destLoc.name)}`
+                                                  }
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-secondary/15 text-secondary text-xs font-semibold border border-outline-variant/60 transition cursor-pointer"
+                                                  title="Open Google Maps Directions"
+                                                >
+                                                  <span className="material-symbols-outlined text-sm">directions</span>
+                                                  <span>Directions</span>
+                                                </a>
+
                                                 <button
                                                   onClick={() => handleRemoveStop(item.id, item.place.name, day.day_number)}
                                                   disabled={isDeleting}
@@ -1019,6 +1588,7 @@ export default function TripDetailPage() {
                                                   )}
                                                   <span className="text-[11px] text-error font-medium">Remove</span>
                                                 </button>
+
                                                 <Link href={`/places/${item.place.id}`} className="text-secondary text-xs font-semibold hover:underline">
                                                   Details →
                                                 </Link>
@@ -1031,8 +1601,8 @@ export default function TripDetailPage() {
                                         {day.day_number === 1 && idx === 2 && (
                                           <div className="my-3 ml-12 p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                             <div className="flex items-center gap-3">
-                                              <div className="w-7 h-7 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed shrink-0 text-xs">
-                                                ✨
+                                              <div className="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+                                                <span className="material-symbols-outlined text-sm">auto_awesome</span>
                                               </div>
                                               <div>
                                                 <div className="font-display font-semibold text-xs text-on-surface">Feeling low energy or dynamic weather incoming?</div>
@@ -1115,6 +1685,58 @@ export default function TripDetailPage() {
                                     <span>+ Add Stop to Day {day.day_number}</span>
                                   </button>
                                 </div>
+
+                                {/* Day Completion / Advance Banner */}
+                                {day.items.length > 0 && (
+                                  <div className="mt-4 pt-3.5 border-t border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/30">
+                                    {isDayAllVisited ? (
+                                      <>
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-700 flex items-center justify-center shrink-0">
+                                            <span className="material-symbols-outlined !text-[15px]">check</span>
+                                          </div>
+                                          <span className="text-xs font-semibold text-emerald-800">
+                                            Day {day.day_number} Complete · All {day.items.length} {day.items.length === 1 ? "stop" : "stops"} visited
+                                          </span>
+                                        </div>
+                                        {day.day_number < days.length ? (
+                                          <button
+                                            onClick={() => {
+                                              const nextDayNum = day.day_number + 1;
+                                              setExpandedDays((prev) => new Set([...prev, nextDayNum]));
+                                            }}
+                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition-colors shadow-2xs cursor-pointer self-start sm:self-auto"
+                                            type="button"
+                                          >
+                                            <span>Proceed to Day {day.day_number + 1}</span>
+                                            <span className="material-symbols-outlined text-sm text-secondary">arrow_forward</span>
+                                          </button>
+                                        ) : (
+                                          <span className="text-[11px] font-mono text-outline">
+                                            Final day of expedition
+                                          </span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+                                          <span className="material-symbols-outlined text-sm text-secondary">task_alt</span>
+                                          <span>
+                                            {visitedInDay} of {day.items.length} {day.items.length === 1 ? "stop" : "stops"} checked in
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={() => handleCompleteDayAndAdvance(day.day_number, day.items)}
+                                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition-colors shadow-2xs cursor-pointer self-start sm:self-auto"
+                                          type="button"
+                                        >
+                                          <span className="material-symbols-outlined text-sm text-secondary">done_all</span>
+                                          <span>Complete Day {day.day_number} &amp; Advance</span>
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </>
                             )}
                           </div>
@@ -1128,95 +1750,165 @@ export default function TripDetailPage() {
               {/* RIGHT COLUMN: Budget, Weather & Packing, Concierge Mini-Bar (4 Columns) */}
               <div className="lg:col-span-4 flex flex-col gap-5">
 
-                {/* MODULE 1: TRIP BUDGET OPTIMIZATION BREAKDOWN */}
+                {/* MODULE 1: 5-PILLAR FINANCIAL ARCHITECTURE & EXPENSE LOGGER */}
                 <div className="bg-surface-container-lowest rounded-xl p-5 shadow-sm border border-outline-variant/60 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold block">Financial Architecture</span>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold block">Financial Engine</span>
                       <h2 className="font-display font-bold text-base text-on-surface">
-                        Estimated Rs. {totalCost.toLocaleString()}
+                        Budget: Rs. {trip.total_budget.toLocaleString()}
                       </h2>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
-                      Live Optimized
-                    </span>
+                    <button
+                      onClick={() => setShowExpenseModal(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary text-white hover:bg-secondary-dark text-xs font-bold transition shadow-xs cursor-pointer"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-xs">add</span>
+                      <span>+ Log Expense</span>
+                    </button>
                   </div>
 
-                  {/* Donut SVG & Inline Legend */}
-                  <div className="flex items-center gap-4 py-1">
-                    <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                        <circle className="text-surface-container-high" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" strokeWidth="3.5" />
-                        {/* Accommodation 45% */}
-                        <circle className="text-primary" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" strokeDasharray="45 55" strokeDashoffset="0" strokeWidth="3.5" />
-                        {/* Transport 29% */}
-                        <circle className="text-secondary" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" strokeDasharray="29 71" strokeDashoffset="-45" strokeWidth="3.5" />
-                        {/* Dining 15% */}
-                        <circle className="text-tertiary-fixed-dim" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" strokeDasharray="15 85" strokeDashoffset="-74" strokeWidth="3.5" />
-                        {/* Passes 11% */}
-                        <circle className="text-outline" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" strokeDasharray="11 89" strokeDashoffset="-89" strokeWidth="3.5" />
-                      </svg>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <span className="font-mono text-[9px] text-outline">Total</span>
-                        <span className="font-display font-bold text-sm text-on-surface">
-                          {(totalCost / 1000).toFixed(1)}k
-                        </span>
-                      </div>
+                  {/* Real Capital Gauges */}
+                  <div className="grid grid-cols-3 gap-2 bg-surface-container-low rounded-xl p-3 border border-outline-variant/40 text-center">
+                    <div>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-outline block">Total Capital</span>
+                      <span className="font-display font-bold text-xs sm:text-sm text-on-surface">
+                        Rs. {(trip.total_budget / 1000).toFixed(0)}k
+                      </span>
                     </div>
-
-                    {/* Legend */}
-                    <div className="flex-1 flex flex-col gap-1.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-on-surface">
-                          <span className="w-2 h-2 rounded-full bg-primary" /> Stays (45%)
-                        </span>
-                        <span className="font-semibold text-on-surface">
-                          Rs. {Math.round(totalCost * 0.45).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-on-surface">
-                          <span className="w-2 h-2 rounded-full bg-secondary" /> Transport (29%)
-                        </span>
-                        <span className="font-semibold text-on-surface">
-                          Rs. {Math.round(totalCost * 0.29).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-on-surface">
-                          <span className="w-2 h-2 rounded-full bg-tertiary-fixed-dim" /> Dining (15%)
-                        </span>
-                        <span className="font-semibold text-on-surface">
-                          Rs. {Math.round(totalCost * 0.15).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-on-surface">
-                          <span className="w-2 h-2 rounded-full bg-outline" /> Passes (11%)
-                        </span>
-                        <span className="font-semibold text-on-surface">
-                          Rs. {Math.round(totalCost * 0.11).toLocaleString()}
-                        </span>
-                      </div>
+                    <div>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-outline block">Logged Spent</span>
+                      <span className={`font-display font-bold text-xs sm:text-sm ${totalExpensesLogged > trip.total_budget ? "text-error" : "text-amber-600"}`}>
+                        Rs. {(totalExpensesLogged / 1000).toFixed(1)}k
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-outline block">Remaining</span>
+                      <span className="font-display font-bold text-xs sm:text-sm text-emerald-700">
+                        Rs. {(remainingBudget / 1000).toFixed(1)}k
+                      </span>
                     </div>
                   </div>
 
-                  {/* AI Budget Tip Card */}
-                  <div className="bg-surface-container-low rounded-lg p-3.5 flex items-start gap-2.5 border border-outline-variant/40">
-                    <span className="text-xs shrink-0">✨</span>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-display font-semibold text-xs text-on-surface">AI Budget Arbitrage</span>
-                      <p className="text-xs text-on-surface-variant leading-relaxed">
-                        Save <strong className="text-secondary font-semibold">Rs. 4,200</strong> by booking verified regional partner stays for {destLoc.name}.
-                      </p>
-                      <button
-                        onClick={() => alert("Shared booking discount applied to itinerary budget!")}
-                        className="text-secondary text-xs font-semibold hover:underline mt-1 self-start cursor-pointer"
-                        type="button"
-                      >
-                        Apply Partner Discount →
-                      </button>
+                  {/* Budget Consumption Bar */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-on-surface-variant font-medium">
+                      <span>Capital Utilization</span>
+                      <span className="font-mono font-bold text-on-surface">{budgetUsedPercent}%</span>
                     </div>
+                    <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          budgetUsedPercent > 90 ? "bg-error" : budgetUsedPercent > 65 ? "bg-amber-500" : "bg-secondary"
+                        }`}
+                        style={{ width: `${budgetUsedPercent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 5-Pillar Breakdown Visual */}
+                  <div className="border-t border-outline-variant/30 pt-3">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold block mb-2">5-Pillar Budget Model</span>
+                    <div className="flex flex-col gap-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-on-surface">
+                          <span className="w-2 h-2 rounded-full bg-primary" /> Stays &amp; Lodging (40%)
+                        </span>
+                        <span className="font-semibold text-on-surface font-mono">
+                          Rs. {budgetBreakdown.stays.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-on-surface">
+                          <span className="w-2 h-2 rounded-full bg-secondary" /> Transit &amp; Fuel (25%)
+                        </span>
+                        <span className="font-semibold text-on-surface font-mono">
+                          Rs. {budgetBreakdown.transit.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-on-surface">
+                          <span className="w-2 h-2 rounded-full bg-tertiary-fixed-dim" /> Dining &amp; Meals (20%)
+                        </span>
+                        <span className="font-semibold text-on-surface font-mono">
+                          Rs. {budgetBreakdown.meals.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-on-surface">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Passes &amp; Activities (10%)
+                        </span>
+                        <span className="font-semibold text-on-surface font-mono">
+                          Rs. {budgetBreakdown.activities.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-on-surface">
+                          <span className="w-2 h-2 rounded-full bg-outline" /> Contingency Reserve (5%)
+                        </span>
+                        <span className="font-semibold text-on-surface font-mono">
+                          Rs. {budgetBreakdown.contingency.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logged Expenses List */}
+                  <div className="border-t border-outline-variant/30 pt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">
+                        Logged In-Trip Expenses ({loggedExpenses.length})
+                      </span>
+                      {loggedExpenses.length > 0 && (
+                        <span className="text-[11px] font-mono font-bold text-on-surface">
+                          Total: Rs. {totalExpensesLogged.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+
+                    {loggedExpenses.length === 0 ? (
+                      <div className="p-3 bg-surface-container-low rounded-lg text-center text-xs text-on-surface-variant">
+                        No in-trip expenses logged yet. Tap <strong>+ Log Expense</strong> during your journey to track fuel, food, or stays live.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                        {loggedExpenses.map((exp) => (
+                          <div
+                            key={exp.id}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-surface-container-low border border-outline-variant/40 text-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-secondary bg-secondary/10 px-1.5 py-0.5 rounded shrink-0">
+                                {exp.category}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-on-surface truncate">
+                                  {exp.notes || exp.category}
+                                </p>
+                                {exp.day_number && (
+                                  <span className="text-[10px] text-outline font-mono">Day {exp.day_number}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-display font-bold text-on-surface">
+                                Rs. {Number(exp.amount).toLocaleString()}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteExpense(exp.id)}
+                                className="w-5 h-5 rounded hover:bg-error/10 text-outline hover:text-error flex items-center justify-center transition cursor-pointer"
+                                type="button"
+                                title="Delete this expense"
+                              >
+                                <span className="material-symbols-outlined text-xs">close</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1340,33 +2032,32 @@ export default function TripDetailPage() {
                   </form>
                 </div>
 
-                {/* MODULE 4: MINI LIVE MAP ANCHOR */}
+                {/* MODULE 4: INTERACTIVE ROUTE MAP CANVAS */}
                 <div className="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/60 overflow-hidden flex flex-col gap-3">
                   <div className="flex items-center justify-between px-0.5">
-                    <span className="font-display font-semibold text-xs text-on-surface">Route Geo-Plot</span>
+                    <div>
+                      <span className="font-display font-semibold text-xs text-on-surface">Interactive Route Geo-Plot</span>
+                      <span className="block text-[10px] text-outline font-mono">{destLoc.name} Spatial Trajectory</span>
+                    </div>
                     {activeItinerary && (
                       <Link
                         className="text-secondary text-xs font-semibold hover:underline flex items-center gap-1"
                         href={`/explore?trip_id=${trip.id}`}
                       >
-                        <span>Full Smart Map</span>
+                        <span>Full Map</span>
                         <span className="material-symbols-outlined text-xs">open_in_new</span>
                       </Link>
                     )}
                   </div>
-                  <Link
-                    href={activeItinerary ? `/explore?trip_id=${trip.id}` : "#"}
-                    className="w-full h-40 bg-cover bg-center rounded-lg relative overflow-hidden shadow-inner block group cursor-pointer border border-outline-variant/40"
-                    style={{
-                      backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAeZZFopOhCZI94ti3xc63DP1DqoAAPgZE1d2DPm3XgzAlSa5AnlHaVuc758YG4E99uEaPdiGiOK9N_A-w9mo0Lge8VxmTUcUxhkta4eJr4HcjBMdxpcnB4mFaT_4CaLbzmkNzsap0PWWt50zvNK1VabbXh3wyMK1TKOA1xFbSdccmygvdk145M5_lW0C7CVtkhIByou7N0WtnIoOtae4mxCQi3UjInHEv6u06ei8f8gCLV8BW8rT6z5g')",
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-primary/10 group-hover:bg-primary/0 transition-colors" />
-                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-surface-container-lowest/90 backdrop-blur-sm text-on-surface font-mono text-[10px] font-semibold flex items-center gap-1 shadow-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-secondary" /> {totalPlaces} Waypoints Active
+
+                  {/* Real Leaflet Map Canvas */}
+                  <div className="w-full h-56 rounded-xl overflow-hidden shadow-inner border border-outline-variant/60 relative">
+                    <div ref={mapContainerRef} className="w-full h-full z-0" />
+                    <div className="absolute bottom-2 left-2 z-[400] px-2.5 py-1 rounded-lg bg-surface-container-lowest/90 backdrop-blur-md text-on-surface font-mono text-[10px] font-bold border border-outline-variant/40 shadow-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{totalPlaces} Waypoints Mapped</span>
                     </div>
-                  </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1381,7 +2072,7 @@ export default function TripDetailPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-unit-3">
                 <div className="w-9 h-9 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
-                  <span className="font-label-md text-label-md">✨</span>
+                  <span className="material-symbols-outlined text-base">auto_awesome</span>
                 </div>
                 <div>
                   <h3 className="font-headline-md text-headline-md text-on-surface">Re-Synthesize Afternoon</h3>
@@ -1457,7 +2148,7 @@ export default function TripDetailPage() {
                 className="flex items-center gap-unit-2 px-unit-5 py-2 rounded-lg bg-secondary text-on-secondary hover:bg-secondary-dark font-title-md text-title-md transition-all shadow-sm cursor-pointer disabled:opacity-60"
                 type="button"
               >
-                <span>{swapUpdating ? "✨ Updating Route..." : "Synthesize Changes"}</span>
+                <span>{swapUpdating ? "Updating Route..." : "Synthesize Changes"}</span>
               </button>
             </div>
           </div>
@@ -1471,7 +2162,7 @@ export default function TripDetailPage() {
       >
         <div className="p-unit-6 bg-surface-container-low flex items-center justify-between">
           <div className="flex items-center gap-unit-3">
-            <span className="font-headline-sm text-headline-sm">✨</span>
+            <span className="material-symbols-outlined text-base text-secondary">auto_awesome</span>
             <h3 className="font-title-lg text-title-lg text-on-surface font-semibold">AI Itinerary Co-Pilot</h3>
           </div>
           <button
@@ -1817,7 +2508,7 @@ export default function TripDetailPage() {
                 <input
                   type="number"
                   min="5000"
-                  step="5000"
+                  step="1000"
                   value={newBudget}
                   onChange={(e) => setNewBudget(parseInt(e.target.value) || 0)}
                   className="w-full bg-surface-container border border-outline-variant rounded-xl px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/15"
@@ -1891,6 +2582,131 @@ export default function TripDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ==================== EXPENSE LOGGER MODAL ==================== */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-2xl p-6 shadow-2xl border border-outline-variant/60 flex flex-col gap-4 relative">
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-secondary text-white flex items-center justify-center shadow-xs">
+                  <span className="material-symbols-outlined text-xl">payments</span>
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base text-on-surface">
+                    Log In-Trip Expense
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">
+                    Track real-time spend across your {trip.duration_days}-day journey
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExpenseModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleLogExpense} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-on-surface mb-1">
+                  Category
+                </label>
+                <select
+                  value={expenseCategory}
+                  onChange={(e) => setExpenseCategory(e.target.value)}
+                  className="w-full bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                >
+                  <option value="Dining">Dining &amp; Food</option>
+                  <option value="Lodging">Stays &amp; Lodging</option>
+                  <option value="Transit">Transit, Fuel &amp; Tolls</option>
+                  <option value="Passes">Entry Tickets &amp; Passes</option>
+                  <option value="Shopping">Shopping &amp; Souvenirs</option>
+                  <option value="Contingency">Emergency &amp; Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface mb-1">
+                  Amount (PKR)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  required
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="e.g. 3500"
+                  className="w-full bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-on-surface placeholder-outline focus:outline-none focus:ring-1 focus:ring-secondary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface mb-1">
+                  Applicable Day (Optional)
+                </label>
+                <select
+                  value={expenseDay || ""}
+                  onChange={(e) => setExpenseDay(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                >
+                  <option value="">General Trip Expense</option>
+                  {days.map((d) => (
+                    <option key={d.day_number} value={d.day_number}>
+                      Day {d.day_number}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-on-surface mb-1">
+                  Description / Vendor
+                </label>
+                <input
+                  type="text"
+                  value={expenseNotes}
+                  onChange={(e) => setExpenseNotes(e.target.value)}
+                  placeholder="e.g. Traditional lunch in Aliabad bazaar"
+                  className="w-full bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-on-surface placeholder-outline focus:outline-none focus:ring-1 focus:ring-secondary"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExpenseModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={expenseLogging || !expenseAmount}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-secondary hover:bg-secondary-dark text-white font-display font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {expenseLogging ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">save</span>
+                      <span>Record Expense</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
       {/* ==================== FOOTER ==================== */}
       <footer className="w-full bg-surface-container-low pt-unit-16 pb-unit-12 border-t border-outline-variant/60">

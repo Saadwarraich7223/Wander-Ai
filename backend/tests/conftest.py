@@ -76,3 +76,18 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Cleanly dispose database engines and ensure process exits without hanging on background threads."""
+    import asyncio
+    try:
+        async def _cleanup():
+            await engine.dispose()
+            from app.core.database import engine as app_engine
+            await app_engine.dispose()
+        asyncio.run(_cleanup())
+    except Exception:
+        pass
+    os._exit(exitstatus)
+

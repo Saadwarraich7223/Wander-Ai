@@ -1,7 +1,7 @@
 """Trips and Itinerary API endpoints."""
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,8 +21,11 @@ from app.schemas.trip import (
     ItineraryItemResponse,
     ItineraryResponse,
     ReoptimizeRequest,
+    TripCheckInRequest,
     TripCreateRequest,
+    TripExpenseLogRequest,
     TripResponse,
+    TripStatusUpdateRequest,
 )
 from app.services.optimizer_service import ItineraryOptimizerService, format_time
 
@@ -87,6 +90,7 @@ def _format_trip_response(trip: Trip) -> TripResponse:
         duration_days=trip.total_days,
         total_budget=trip.total_budget,
         pace=getattr(trip, "pace", "moderate"),
+        status=getattr(trip, "status", "planning"),
         start_date=trip.start_date,
         preferences=trip.preferences,
         active_itinerary=active_itin_res,
@@ -429,6 +433,99 @@ async def remove_day_from_trip(
     await db.commit()
     db.expire_all()
 
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
+
+
+@router.patch("/{trip_id}/status", response_model=TripResponse)
+async def update_trip_status(
+    trip_id: uuid.UUID,
+    payload: TripStatusUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update trip status lifecycle (planning, active, completed, cancelled)."""
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    trip.status = payload.status
+    await db.commit()
+    db.expire_all()
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
+
+
+@router.post("/{trip_id}/checkin", response_model=TripResponse)
+async def toggle_stop_checkin(
+    trip_id: uuid.UUID,
+    payload: TripCheckInRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Toggle visited status of an itinerary stop."""
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    prefs = dict(trip.preferences or {})
+    visited = list(prefs.get("visited_stops", []))
+    item_id_str = str(payload.item_id)
+    if payload.is_visited:
+        if item_id_str not in visited:
+            visited.append(item_id_str)
+    else:
+        if item_id_str in visited:
+            visited.remove(item_id_str)
+    prefs["visited_stops"] = visited
+    trip.preferences = prefs
+    await db.commit()
+    db.expire_all()
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
+
+
+@router.post("/{trip_id}/expenses", response_model=TripResponse)
+async def log_trip_expense(
+    trip_id: uuid.UUID,
+    payload: TripExpenseLogRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Log an in-trip actual expense."""
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    prefs = dict(trip.preferences or {})
+    expenses = list(prefs.get("expenses", []))
+    new_expense = {
+        "id": str(uuid.uuid4()),
+        "category": payload.category,
+        "amount": payload.amount,
+        "notes": payload.notes,
+        "day_number": payload.day_number,
+        "timestamp": datetime.now().isoformat(),
+    }
+    expenses.append(new_expense)
+    prefs["expenses"] = expenses
+    trip.preferences = prefs
+    await db.commit()
+    db.expire_all()
+    fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    return _format_trip_response(fresh_trip)
+
+
+@router.delete("/{trip_id}/expenses/{expense_id}", response_model=TripResponse)
+async def delete_trip_expense(
+    trip_id: uuid.UUID,
+    expense_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Delete a logged in-trip expense."""
+    user_id = current_user.id
+    trip = await _load_trip_with_itinerary(trip_id, user_id, db)
+    prefs = dict(trip.preferences or {})
+    expenses = [e for e in prefs.get("expenses", []) if e.get("id") != expense_id]
+    prefs["expenses"] = expenses
+    trip.preferences = prefs
+    await db.commit()
+    db.expire_all()
     fresh_trip = await _load_trip_with_itinerary(trip_id, user_id, db)
     return _format_trip_response(fresh_trip)
 

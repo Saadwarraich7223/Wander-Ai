@@ -86,6 +86,22 @@ export const tripsApi = {
     const res = await api.delete(`/trips/${tripId}/stops/${itemId}`);
     return res.data;
   },
+  updateStatus: async (id: string, status: "planning" | "active" | "completed" | "cancelled") => {
+    const res = await api.patch(`/trips/${id}/status`, { status });
+    return res.data;
+  },
+  toggleCheckIn: async (tripId: string, itemId: string, isVisited: boolean = true) => {
+    const res = await api.post(`/trips/${tripId}/checkin`, { item_id: itemId, is_visited: isVisited });
+    return res.data;
+  },
+  logExpense: async (tripId: string, expense: { category: string; amount: number; notes?: string; day_number?: number }) => {
+    const res = await api.post(`/trips/${tripId}/expenses`, expense);
+    return res.data;
+  },
+  deleteExpense: async (tripId: string, expenseId: string) => {
+    const res = await api.delete(`/trips/${tripId}/expenses/${expenseId}`);
+    return res.data;
+  },
 };
 
 export const placesApi = {

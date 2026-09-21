@@ -168,9 +168,10 @@ export default function AIChatWidget() {
                           <Link
                             key={i}
                             href={act.payload || "/planner"}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 text-[11px] font-semibold transition-colors"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 text-[11px] font-semibold transition-colors"
                           >
-                            <span>✨ {act.label}</span>
+                            <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                            <span>{act.label}</span>
                           </Link>
                         ))}
                       </div>
@@ -200,9 +201,9 @@ export default function AIChatWidget() {
           {messages.length <= 2 && (
             <div className="px-4 py-2 bg-surface-container-low/60 border-t border-outline-variant/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
               {[
-                "☀️ Weather in Hunza",
-                "🕌 Places in Lahore",
-                "🚙 5-day Skardu plan",
+                "Weather in Hunza",
+                "Places in Lahore",
+                "5-day Skardu plan",
               ].map((starter) => (
                 <button
                   key={starter}

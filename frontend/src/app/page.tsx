@@ -657,21 +657,21 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => { setPrompt("Hunza Valley Autumn 5 Days"); setSearchOpen(false); }}
-                  className="px-3 py-1.5 bg-surface-container rounded-lg hover:bg-surface-container-high transition-colors font-medium text-on-surface"
+                  className="px-3 py-1.5 bg-surface-container rounded-lg hover:bg-surface-container-high transition-colors font-medium text-on-surface text-xs"
                 >
-                  🍁 Hunza Express
+                  Hunza Express
                 </button>
                 <button
                   onClick={() => { setPrompt("Lahore Old Walled City Food Tour"); setSearchOpen(false); }}
-                  className="px-3 py-1.5 bg-surface-container rounded-lg hover:bg-surface-container-high transition-colors font-medium text-on-surface"
+                  className="px-3 py-1.5 bg-surface-container rounded-lg hover:bg-surface-container-high transition-colors font-medium text-on-surface text-xs"
                 >
-                  🕌 Lahore Walled City
+                  Lahore Walled City
                 </button>
                 <button
                   onClick={() => { setPrompt("Skardu & Deosai 6 Days Budget"); setSearchOpen(false); }}
-                  className="px-3 py-1.5 bg-surface-container rounded-lg hover:bg-surface-container-high transition-colors font-medium text-on-surface"
+                  className="px-3 py-1.5 bg-surface-container rounded-lg hover:bg-surface-container-high transition-colors font-medium text-on-surface text-xs"
                 >
-                  🏔 Skardu & Deosai
+                  Skardu &amp; Deosai
                 </button>
               </div>
             </div>
@@ -711,7 +711,8 @@ export default function HomePage() {
                       className="group flex items-center justify-center gap-2.5 px-6 py-3.5 sm:py-3 rounded-xl bg-secondary text-white hover:bg-secondary-dark transition-all duration-300 shadow-sm hover:shadow-glow cursor-pointer text-sm font-semibold hover:-translate-y-0.5"
                       type="button"
                     >
-                      <span>✨ Plan My Trip</span>
+                      <span className="material-symbols-outlined text-base">auto_awesome</span>
+                      <span>Plan My Trip</span>
                       <span className="material-symbols-outlined text-base transition-transform group-hover:translate-x-1">
                         arrow_forward
                       </span>

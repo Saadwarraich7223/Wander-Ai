@@ -1481,18 +1481,18 @@ export function getDestinationInterests(dest: PakistanLocation): DestinationInte
 
   if (isCoastal) {
     const options: DestinationInterest[] = [
-      { id: "coastal_beaches", label: "🌊 Arabian Sea Beaches & Cliffs", isDefault: true },
-      { id: "seafood_gastronomy", label: "🦞 Fresh Seafood & Harbor Dining", isDefault: true },
-      { id: "photography", label: "📸 Hammerhead Sunset Photography", isDefault: true },
-      { id: "rock_formations", label: "🗿 Sphinx & Coastal Rock Formations", isDefault: true },
-      { id: "marine_boating", label: "🚤 Deep-Sea Boating & Marine Reserve" },
-      { id: "beach_camping", label: "🏕️ Coastal Glamping & Bioluminescence" },
-      { id: "port_bazaars", label: "🛍️ Silk Route Port Bazaars" },
-      { id: "stargazing", label: "🌌 Oceanic Horizon Stargazing" },
+      { id: "coastal_beaches", label: "Arabian Sea Beaches & Cliffs", isDefault: true },
+      { id: "seafood_gastronomy", label: "Fresh Seafood & Harbor Dining", isDefault: true },
+      { id: "photography", label: "Hammerhead Sunset Photography", isDefault: true },
+      { id: "rock_formations", label: "Sphinx & Coastal Rock Formations", isDefault: true },
+      { id: "marine_boating", label: "Deep-Sea Boating & Marine Reserve" },
+      { id: "beach_camping", label: "Coastal Glamping & Bioluminescence" },
+      { id: "port_bazaars", label: "Silk Route Port Bazaars" },
+      { id: "stargazing", label: "Oceanic Horizon Stargazing" },
     ];
     return {
       category: "coastal_marine",
-      categoryBadge: "🌊 Coastal & Marine",
+      categoryBadge: "Coastal & Marine",
       title: "Coastal & Arabian Sea Themes",
       subtitle: "Calibrated for pristine beaches, coastal cliffs, seafood feasts & marine adventures",
       options,
@@ -1502,18 +1502,18 @@ export function getDestinationInterests(dest: PakistanLocation): DestinationInte
 
   if (isDesertOrSouthern) {
     const options: DestinationInterest[] = [
-      { id: "desert_safari", label: "🏜️ 4x4 Desert Dunes Safari", isDefault: true },
-      { id: "royal_forts", label: "🕌 Royal Palaces & Fortresses", isDefault: true },
-      { id: "photography", label: "📸 Sunset & Astrophotography", isDefault: true },
-      { id: "gastronomy", label: "🍲 Saraiki & Royal Gastronomy", isDefault: true },
-      { id: "stargazing_glamping", label: "🏕️ Desert Camp & Star Gazing" },
-      { id: "wetlands_wildlife", label: "🦆 National Park Wildlife & Wetlands" },
-      { id: "artisan_crafts", label: "🛍️ Chunri & Handcrafted Bazaars" },
-      { id: "sufi_heritage", label: "📜 Ancient Hakra Civilization Shrines" },
+      { id: "desert_safari", label: "4x4 Desert Dunes Safari", isDefault: true },
+      { id: "royal_forts", label: "Royal Palaces & Fortresses", isDefault: true },
+      { id: "photography", label: "Sunset & Astrophotography", isDefault: true },
+      { id: "gastronomy", label: "Saraiki & Royal Gastronomy", isDefault: true },
+      { id: "stargazing_glamping", label: "Desert Camp & Star Gazing" },
+      { id: "wetlands_wildlife", label: "National Park Wildlife & Wetlands" },
+      { id: "artisan_crafts", label: "Chunri & Handcrafted Bazaars" },
+      { id: "sufi_heritage", label: "Ancient Hakra Civilization Shrines" },
     ];
     return {
       category: "desert_heritage",
-      categoryBadge: "🏜️ Desert & Royal Heritage",
+      categoryBadge: "Desert & Royal Heritage",
       title: "Desert, Palaces & Southern Punjab Themes",
       subtitle: "Calibrated for Cholistan dunes, royal palaces, wildlife sanctuaries & cultural bazaars",
       options,
@@ -1523,18 +1523,18 @@ export function getDestinationInterests(dest: PakistanLocation): DestinationInte
 
   if (isBalochHighlands) {
     const options: DestinationInterest[] = [
-      { id: "juniper_forests", label: "🌲 Ancient Juniper World Reserves", isDefault: true },
-      { id: "canyon_gorges", label: "🧗 Hidden Canyon Gorges & Streams", isDefault: true },
-      { id: "photography", label: "📸 Rugged Plateau & Sunset Photography", isDefault: true },
-      { id: "balochi_gastronomy", label: "🍲 Balochi Rosh, Sajji & Kakar Bread", isDefault: true },
-      { id: "highland_camping", label: "🏕️ Star-lit High Plateau Camping" },
-      { id: "geological_marvels", label: "🗿 Mud Volcanoes & Rock Formations" },
-      { id: "tribal_bazaars", label: "🛍️ Baloch Tribal Mirrorwork & Rugs" },
-      { id: "historic_passes", label: "📜 Historic Bolan Pass & Silk Forts" },
+      { id: "juniper_forests", label: "Ancient Juniper World Reserves", isDefault: true },
+      { id: "canyon_gorges", label: "Hidden Canyon Gorges & Streams", isDefault: true },
+      { id: "photography", label: "Rugged Plateau & Sunset Photography", isDefault: true },
+      { id: "balochi_gastronomy", label: "Balochi Rosh, Sajji & Kakar Bread", isDefault: true },
+      { id: "highland_camping", label: "Star-lit High Plateau Camping" },
+      { id: "geological_marvels", label: "Mud Volcanoes & Rock Formations" },
+      { id: "tribal_bazaars", label: "Baloch Tribal Mirrorwork & Rugs" },
+      { id: "historic_passes", label: "Historic Bolan Pass & Silk Forts" },
     ];
     return {
       category: "balochistan_highlands",
-      categoryBadge: "🏔️ Highlands & Canyons",
+      categoryBadge: "Highlands & Canyons",
       title: "High Plateaus, Canyons & Juniper Forest Themes",
       subtitle: "Calibrated for ancient juniper forests, hidden gorges, turquoise canyon streams & tribal crafts",
       options,
@@ -1544,18 +1544,18 @@ export function getDestinationInterests(dest: PakistanLocation): DestinationInte
 
   if (isCulturalMetropolis) {
     const options: DestinationInterest[] = [
-      { id: "mughal_heritage", label: "🕌 Mughal Architecture & UNESCO Sites", isDefault: true },
-      { id: "food_street", label: "🍲 Legendary Food Streets & Gastronomy", isDefault: true },
-      { id: "photography", label: "📸 Heritage & Street Photography", isDefault: true },
-      { id: "craft_bazaars", label: "🛍️ Walled City Bazaars & Silk Markets", isDefault: true },
-      { id: "sufi_qawwali", label: "🎶 Historic Sufi Shrines & Qawwali" },
-      { id: "museums_archaeology", label: "🏛️ Archaeological Museums & Relics" },
-      { id: "royal_gardens", label: "🌳 Mughal Royal Terraces & Parks" },
-      { id: "chaikhana_social", label: "☕ Traditional Chaikhana Socials" },
+      { id: "mughal_heritage", label: "Mughal Architecture & UNESCO Sites", isDefault: true },
+      { id: "food_street", label: "Legendary Food Streets & Gastronomy", isDefault: true },
+      { id: "photography", label: "Heritage & Street Photography", isDefault: true },
+      { id: "craft_bazaars", label: "Walled City Bazaars & Silk Markets", isDefault: true },
+      { id: "sufi_qawwali", label: "Historic Sufi Shrines & Qawwali" },
+      { id: "museums_archaeology", label: "Archaeological Museums & Relics" },
+      { id: "royal_gardens", label: "Mughal Royal Terraces & Parks" },
+      { id: "chaikhana_social", label: "Traditional Chaikhana Socials" },
     ];
     return {
       category: "cultural_metropolis",
-      categoryBadge: "🕌 Heritage & Food Trails",
+      categoryBadge: "Heritage & Food Trails",
       title: "Cultural, Heritage & Gastronomy Themes",
       subtitle: "Calibrated for historical monuments, bustling food streets & artisan bazaars",
       options,
@@ -1565,18 +1565,18 @@ export function getDestinationInterests(dest: PakistanLocation): DestinationInte
 
   if (isAlpineHigh) {
     const options: DestinationInterest[] = [
-      { id: "nature_peaks", label: "🏔️ Nature & 7,000m+ High Peaks", isDefault: true },
-      { id: "alpine_trekking", label: "🧗 Alpine Trails & Glacier Passes", isDefault: true },
-      { id: "photography", label: "📸 Haute Mountain Photography", isDefault: true },
-      { id: "stargazing", label: "🌌 High-Altitude Milky Way Stargazing", isDefault: true },
-      { id: "glacial_lakes", label: "🛶 Turquoise Glacial Lakes & Boating" },
-      { id: "glamping_chalets", label: "🏕️ Boutique Wooden Chalets & Glamping" },
-      { id: "silk_road_food", label: "🍲 Apricot, Walnut & Indigenous Fare" },
-      { id: "gemstone_bazaars", label: "🛍️ Mountain Gemstones & Handcrafts" },
+      { id: "nature_peaks", label: "Nature & 7,000m+ High Peaks", isDefault: true },
+      { id: "alpine_trekking", label: "Alpine Trails & Glacier Passes", isDefault: true },
+      { id: "photography", label: "Haute Mountain Photography", isDefault: true },
+      { id: "stargazing", label: "High-Altitude Milky Way Stargazing", isDefault: true },
+      { id: "glacial_lakes", label: "Turquoise Glacial Lakes & Boating" },
+      { id: "glamping_chalets", label: "Boutique Wooden Chalets & Glamping" },
+      { id: "silk_road_food", label: "Apricot, Walnut & Indigenous Fare" },
+      { id: "gemstone_bazaars", label: "Mountain Gemstones & Handcrafts" },
     ];
     return {
       category: "alpine_peaks",
-      categoryBadge: "🏔️ Alpine & 7,000m Peaks",
+      categoryBadge: "Alpine & 7,000m Peaks",
       title: "Alpine, Glaciers & Karakoram Themes",
       subtitle: "Calibrated for soaring summit viewpoints, glacier lakes, high passes & starry skies",
       options,
@@ -1586,18 +1586,18 @@ export function getDestinationInterests(dest: PakistanLocation): DestinationInte
 
   // Default / Scenic Valleys & Hill Stations (Murree, Neelum, Swat, Galyat, Abbottabad, Shogran, etc.)
   const options: DestinationInterest[] = [
-    { id: "nature_canopy", label: "🌲 Dense Pine Canopy & River Streams", isDefault: true },
-    { id: "scenic_ridges", label: "🚡 Chairlifts & Panoramic Ridge Walks", isDefault: true },
-    { id: "photography", label: "📸 Mountain Sunset Photography", isDefault: true },
-    { id: "trout_gastronomy", label: "🍲 Fresh River Trout & Mountain Cafes", isDefault: true },
-    { id: "glamping_cabins", label: "🏕️ Riverside Cabins & Forest Stays" },
-    { id: "nature_hikes", label: "🧗 Gentle Nature Trails & Waterfalls" },
-    { id: "local_shawls", label: "🛍️ Handcrafted Pashmina & Shawl Bazaars" },
-    { id: "stargazing", label: "🌌 Pine Ridge Stargazing" },
+    { id: "nature_canopy", label: "Dense Pine Canopy & River Streams", isDefault: true },
+    { id: "scenic_ridges", label: "Chairlifts & Panoramic Ridge Walks", isDefault: true },
+    { id: "photography", label: "Mountain Sunset Photography", isDefault: true },
+    { id: "trout_gastronomy", label: "Fresh River Trout & Mountain Cafes", isDefault: true },
+    { id: "glamping_cabins", label: "Riverside Cabins & Forest Stays" },
+    { id: "nature_hikes", label: "Gentle Nature Trails & Waterfalls" },
+    { id: "local_shawls", label: "Handcrafted Pashmina & Shawl Bazaars" },
+    { id: "stargazing", label: "Pine Ridge Stargazing" },
   ];
   return {
     category: "scenic_valleys",
-    categoryBadge: "🌲 Pine Valleys & Ridges",
+    categoryBadge: "Pine Valleys & Ridges",
     title: "Scenic Valleys & Hill Station Themes",
     subtitle: "Calibrated for pine forests, scenic chairlifts, fresh river trout & mountain trails",
     options,

@@ -194,12 +194,12 @@ export default function Navbar({
 
           {onPlanTrip ? (
             <button onClick={onPlanTrip} className={ctaClass} type="button">
-              <span>✨</span>
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
               <span className="hidden xs:inline">Plan Trip</span>
             </button>
           ) : (
             <Link href="/planner" className={ctaClass}>
-              <span>✨</span>
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
               <span className="hidden xs:inline">Plan Trip</span>
             </Link>
           )}
@@ -377,7 +377,7 @@ export default function Navbar({
               className={`${ctaClass} w-full mt-2 py-3`}
               type="button"
             >
-              <span>✨</span>
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
               <span>Plan Trip with AI</span>
             </button>
           ) : (
@@ -386,7 +386,7 @@ export default function Navbar({
               onClick={closeDrawer}
               className={`${ctaClass} w-full mt-2 py-3`}
             >
-              <span>✨</span>
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
               <span>Plan Trip with AI</span>
             </Link>
           )}

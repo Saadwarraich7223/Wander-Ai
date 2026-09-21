@@ -20,7 +20,7 @@ export default function TripsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Filters & Search
-  const [activeTab, setActiveTab] = useState<"all" | "active" | "upcoming" | "draft">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "planning" | "completed">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -36,6 +36,15 @@ export default function TripsPage() {
       setError(getErrorMessage(err, "Failed to load itineraries"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (tripId: string, newStatus: "planning" | "active" | "completed") => {
+    try {
+      const updated = await tripsApi.updateStatus(tripId, newStatus);
+      setTrips((prev) => prev.map((t) => (t.id === tripId ? updated : t)));
+    } catch (err: any) {
+      alert(getErrorMessage(err, "Failed to update trip status"));
     }
   };
 
@@ -57,8 +66,9 @@ export default function TripsPage() {
 
     if (!matchesSearch) return false;
 
-    if (activeTab === "active") return trip.active_itinerary !== undefined;
-    if (activeTab === "draft") return !trip.active_itinerary;
+    if (activeTab === "active") return trip.status === "active";
+    if (activeTab === "planning") return !trip.status || trip.status === "planning";
+    if (activeTab === "completed") return trip.status === "completed";
     return true;
   });
 
@@ -90,7 +100,75 @@ export default function TripsPage() {
   // Calculate Aggregates
   const totalCapital = trips.reduce((acc, t) => acc + (t.total_budget || 0), 0);
   const totalKm = trips.reduce((acc, t) => acc + getTripDistance(t), 0);
-  const activeTrip = trips.length > 0 ? trips[0] : null;
+
+  // Active trip calculation (prioritize 'active' status trip, fallback to first trip)
+  const activeTrip = useMemo(() => {
+    return trips.find((t) => t.status === "active") || (trips.length > 0 ? trips[0] : null);
+  }, [trips]);
+
+  // Flatten all scheduled POIs/stops across all days for the featured active trip
+  const activeAllItems = useMemo(() => {
+    if (!activeTrip?.active_itinerary?.days) return [];
+    const items: {
+      dayNum: number;
+      indexInDay: number;
+      globalIndex: number;
+      item: any;
+    }[] = [];
+    let globalIdx = 0;
+    activeTrip.active_itinerary.days.forEach((day, dIdx) => {
+      day.items?.forEach((item, iIdx) => {
+        items.push({
+          dayNum: day.day_number || dIdx + 1,
+          indexInDay: iIdx + 1,
+          globalIndex: ++globalIdx,
+          item,
+        });
+      });
+    });
+    return items;
+  }, [activeTrip]);
+
+  // Set of visited stop IDs for the active trip
+  const activeVisitedSet = useMemo(() => {
+    return new Set<string>((activeTrip?.preferences?.visited_stops || []).map(String));
+  }, [activeTrip]);
+
+  const activeVisitedCount = useMemo(() => {
+    return activeAllItems.filter(({ item }) => activeVisitedSet.has(String(item.id))).length;
+  }, [activeAllItems, activeVisitedSet]);
+
+  const activeTotalStops = activeAllItems.length;
+  const activeProgressPercent = activeTotalStops > 0 ? Math.round((activeVisitedCount / activeTotalStops) * 100) : 0;
+  const isAllStopsVisited = activeTotalStops > 0 && activeVisitedCount >= activeTotalStops;
+
+  // First unvisited waypoint / milestone
+  const activeFirstUnvisited = useMemo(() => {
+    return activeAllItems.find(({ item }) => !activeVisitedSet.has(String(item.id))) || null;
+  }, [activeAllItems, activeVisitedSet]);
+
+  // Current milestone to feature (the first unvisited one, or the last one if all completed, or the first item)
+  const featuredMilestone = activeFirstUnvisited || (activeAllItems.length > 0 ? activeAllItems[0] : null);
+
+  // Active trip expenses & budget tracking
+  const activeExpenses = useMemo(() => {
+    return ((activeTrip?.preferences as any)?.expenses || []) as {
+      id: string;
+      amount: number;
+      category: string;
+      note?: string;
+      created_at?: string;
+    }[];
+  }, [activeTrip]);
+
+  const activeExpensesLogged = useMemo(() => {
+    return activeExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  }, [activeExpenses]);
+
+  const activeAllocatedBudget = activeTrip?.total_budget || activeTrip?.active_itinerary?.total_cost || 1;
+  const activeRemainingBudget = Math.max(0, activeAllocatedBudget - activeExpensesLogged);
+  const activeBudgetUsedPercent = Math.min(100, Math.round((activeExpensesLogged / activeAllocatedBudget) * 100));
+  const isOverBudget = activeExpensesLogged > activeAllocatedBudget;
 
   // Derive dynamic telemetry for the featured active trip
   const activeOriginLoc = useMemo(() => {
@@ -230,7 +308,7 @@ export default function TripsPage() {
                     }`}
                   type="button"
                 >
-                  <span>All Trips</span>
+                  <span>All Expeditions</span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === "all" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface"}`}>
                     {trips.length}
                   </span>
@@ -244,24 +322,38 @@ export default function TripsPage() {
                     }`}
                   type="button"
                 >
-                  <span className="w-2 h-2 rounded-full bg-secondary" />
-                  <span>Active Expeditions</span>
-                  <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px]">
-                    {trips.filter((t) => t.active_itinerary).length}
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span>Live Expeditions</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === "active" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface"}`}>
+                    {trips.filter((t) => t.status === "active").length}
                   </span>
                 </button>
 
                 <button
-                  onClick={() => setActiveTab("draft")}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTab === "draft"
+                  onClick={() => setActiveTab("planning")}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTab === "planning"
                     ? "bg-secondary text-white shadow-xs"
                     : "bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-outline-variant/60"
                     }`}
                   type="button"
                 >
-                  <span>Draft Blueprints</span>
-                  <span className="px-2 py-0.5 rounded-full bg-surface-container text-on-surface text-[10px]">
-                    {trips.filter((t) => !t.active_itinerary).length}
+                  <span>Upcoming Plans</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === "planning" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface"}`}>
+                    {trips.filter((t) => !t.status || t.status === "planning").length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("completed")}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTab === "completed"
+                    ? "bg-secondary text-white shadow-xs"
+                    : "bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-outline-variant/60"
+                    }`}
+                  type="button"
+                >
+                  <span>Completed</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === "completed" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface"}`}>
+                    {trips.filter((t) => t.status === "completed").length}
                   </span>
                 </button>
               </div>
@@ -356,13 +448,27 @@ export default function TripsPage() {
 
                           {/* Status Badges */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-white text-xs font-mono font-bold tracking-wide">
-                              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                              ACTIVE EXPEDITION · {activeTrip.duration_days} DAYS
-                            </span>
+                            {activeTrip.status === "active" ? (
+                              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-white text-xs font-mono font-bold tracking-wide">
+                                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                                ACTIVE EXPEDITION · {activeVisitedCount}/{activeTotalStops} STOPS VISITED ({activeProgressPercent}%)
+                              </span>
+                            ) : activeTrip.status === "completed" ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-700 text-white text-xs font-mono font-bold tracking-wide">
+                                <span className="material-symbols-outlined text-sm">check_circle</span>
+                                COMPLETED EXPEDITION · {activeTrip.duration_days} DAYS
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-white text-xs font-mono font-bold tracking-wide">
+                                <span className="material-symbols-outlined text-sm">schedule</span>
+                                EXPEDITION BLUEPRINT · {activeTrip.duration_days} DAYS
+                              </span>
+                            )}
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container text-xs text-on-surface-variant font-medium">
                               <span className="material-symbols-outlined text-sm">calendar_today</span>
-                              {activeTrip.start_date ? activeTrip.start_date : "Flexible Schedule"}
+                              {activeTrip.status === "active" && activeFirstUnvisited
+                                ? `Day ${activeFirstUnvisited.dayNum} of ${activeTrip.duration_days}`
+                                : activeTrip.start_date ? activeTrip.start_date : "Flexible Schedule"}
                             </span>
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container text-xs text-on-surface-variant capitalize">
                               <span className="material-symbols-outlined text-sm">speed</span>
@@ -378,8 +484,10 @@ export default function TripsPage() {
                             <p className="text-xs sm:text-sm text-on-surface-variant mt-1.5 flex items-center gap-2">
                               <span className="material-symbols-outlined text-base text-secondary">alt_route</span>
                               <span>
-                                {activeTrip.active_itinerary?.days[0]?.items[0]?.place.name
-                                  ? `${activeTrip.active_itinerary.days[0].items[0].place.name} → ${activeDestLoc.name} Route`
+                                {activeFirstUnvisited
+                                  ? `Current Target: ${activeFirstUnvisited.item.place.name} (Day ${activeFirstUnvisited.dayNum}) → ${activeDestLoc.name} Route`
+                                  : isAllStopsVisited
+                                  ? `All Waypoints Explored · ${activeDestLoc.name} Corridor Completed`
                                   : `${activeDestLoc.name} · ${activeDestLoc.province} Corridor`}
                               </span>
                             </p>
@@ -405,51 +513,92 @@ export default function TripsPage() {
                               </div>
                             </div>
 
-                            {/* Milestone */}
-                            {activeTrip.active_itinerary?.days[0]?.items[0] && (
+                            {/* Dynamic Milestone Card */}
+                            {isAllStopsVisited ? (
                               <div className="flex items-center justify-between gap-4 pt-2 border-t border-outline-variant/30">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0">
-                                    WP1
+                                  <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                    <span className="material-symbols-outlined text-sm">check</span>
                                   </div>
                                   <div>
                                     <div className="font-display font-semibold text-xs text-on-surface">
-                                      {activeTrip.active_itinerary.days[0].items[0].place.name}
+                                      All {activeTotalStops} Waypoints Explored
+                                    </div>
+                                    <div className="text-[11px] text-emerald-700 font-medium">
+                                      Expedition itinerary objectives 100% completed
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-800 font-mono text-[10px] font-semibold">
+                                  Validated
+                                </span>
+                              </div>
+                            ) : featuredMilestone ? (
+                              <div className="flex items-center justify-between gap-4 pt-2 border-t border-outline-variant/30">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0">
+                                    WP{featuredMilestone.globalIndex}
+                                  </div>
+                                  <div>
+                                    <div className="font-display font-semibold text-xs text-on-surface flex items-center gap-2">
+                                      <span>{featuredMilestone.item.place.name}</span>
+                                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-normal">
+                                        Day {featuredMilestone.dayNum} · Spot #{featuredMilestone.indexInDay}
+                                      </span>
                                     </div>
                                     <div className="text-[11px] text-on-surface-variant">
-                                      Visit Duration: {activeTrip.active_itinerary.days[0].items[0].visit_duration_minutes} mins
+                                      Visit Duration: {featuredMilestone.item.visit_duration_minutes} mins · {activeFirstUnvisited?.item.id === featuredMilestone.item.id ? "Next Objective" : "Scheduled"}
                                     </div>
                                   </div>
                                 </div>
                                 <span className="px-2.5 py-1 rounded bg-surface-container font-mono text-[10px] text-on-surface font-semibold">
-                                  Validated
+                                  {activeFirstUnvisited?.item.id === featuredMilestone.item.id ? "Active Objective" : "Validated"}
                                 </span>
                               </div>
-                            )}
+                            ) : null}
                           </div>
 
-                          {/* Budget Liquidity Bar */}
-                          <div className="space-y-1.5 pt-1">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-on-surface font-medium">
-                                Budget Liquidity: PKR {(activeTrip.active_itinerary?.total_cost || activeTrip.total_budget).toLocaleString()} estimated of PKR {activeTrip.total_budget.toLocaleString()} allocated
-                              </span>
-                              <span className="text-secondary font-semibold">Optimal Pacing</span>
+                          {/* Dynamic Budget Liquidity & Spend Bar */}
+                          {activeExpensesLogged > 0 ? (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-on-surface font-medium">
+                                  Capital Spend: PKR {activeExpensesLogged.toLocaleString()} logged of PKR {activeAllocatedBudget.toLocaleString()} allocated ({isOverBudget ? `Over by PKR ${(activeExpensesLogged - activeAllocatedBudget).toLocaleString()}` : `PKR ${activeRemainingBudget.toLocaleString()} remaining`})
+                                </span>
+                                <span className={`font-semibold ${isOverBudget ? "text-rose-600" : activeBudgetUsedPercent > 85 ? "text-amber-600" : "text-secondary"}`}>
+                                  {isOverBudget ? "Over Budget" : `${activeBudgetUsedPercent}% Logged`}
+                                </span>
+                              </div>
+                              <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${isOverBudget ? "bg-rose-500" : activeBudgetUsedPercent > 85 ? "bg-amber-500" : "bg-secondary"}`}
+                                  style={{ width: `${Math.min(100, (activeExpensesLogged / activeAllocatedBudget) * 100)}%` }}
+                                />
+                              </div>
                             </div>
-                            <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
-                              <div
-                                className="h-full bg-secondary rounded-full"
-                                style={{
-                                  width: `${Math.min(
-                                    100,
-                                    ((activeTrip.active_itinerary?.total_cost || activeTrip.total_budget) /
-                                      activeTrip.total_budget) *
-                                    100
-                                  )}%`,
-                                }}
-                              />
+                          ) : (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-on-surface font-medium">
+                                  Budget Liquidity: PKR {(activeTrip.active_itinerary?.total_cost || activeTrip.total_budget).toLocaleString()} estimated of PKR {activeTrip.total_budget.toLocaleString()} allocated
+                                </span>
+                                <span className="text-secondary font-semibold">Optimal Pacing</span>
+                              </div>
+                              <div className="w-full h-2 rounded-full bg-surface-container-high overflow-hidden">
+                                <div
+                                  className="h-full bg-secondary rounded-full"
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      ((activeTrip.active_itinerary?.total_cost || activeTrip.total_budget) /
+                                        activeTrip.total_budget) *
+                                      100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
 
                         {/* Action Buttons */}
@@ -543,10 +692,21 @@ export default function TripsPage() {
                         <div className="space-y-4">
                           {/* Card Header Tag */}
                           <div className="flex items-center justify-between text-xs text-on-surface-variant">
-                            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-secondary px-2 py-0.5 rounded bg-secondary-container/40">
-                              <span className="material-symbols-outlined text-xs">tune</span>
-                              {trip.pace} Pace
-                            </span>
+                            {trip.status === "active" ? (
+                              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-500/15 px-2 py-0.5 rounded-md">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                Live Expedition
+                              </span>
+                            ) : trip.status === "completed" ? (
+                              <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-500/15 px-2 py-0.5 rounded-md">
+                                Completed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-secondary px-2 py-0.5 rounded bg-secondary-container/40">
+                                <span className="material-symbols-outlined text-xs">tune</span>
+                                {trip.pace} Pace
+                              </span>
+                            )}
                             <span className="font-mono text-[11px]">
                               {trip.duration_days} Days · {totalStops} Stops
                             </span>
@@ -562,8 +722,31 @@ export default function TripsPage() {
                             </p>
                           </div>
 
+                          {/* Live In-Trip Visited Stops Progress */}
+                          {trip.status === "active" && (
+                            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between text-xs text-emerald-800">
+                                <span className="font-bold flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-sm">navigation</span>
+                                  Expedition Active
+                                </span>
+                                <span className="font-mono text-[11px]">
+                                  {(trip.preferences?.visited_stops || []).length} / {totalStops} visited
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full bg-emerald-200 overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                                  style={{
+                                    width: `${totalStops > 0 ? Math.round(((trip.preferences?.visited_stops || []).length / totalStops) * 100) : 0}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
                           {/* Feasibility Solver Badge */}
-                          {activeItin && (
+                          {activeItin && trip.status !== "active" && (
                             <div className="p-2.5 rounded-lg bg-surface-container-low border border-outline-variant/40 flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 text-xs text-on-surface">
                                 <span className="material-symbols-outlined text-sm text-secondary">verified</span>
@@ -574,40 +757,82 @@ export default function TripsPage() {
                           )}
 
                           {/* Metrics Grid */}
-                          <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-surface-container border border-outline-variant/30 text-center">
-                            <div>
-                              <div className="font-mono text-[9px] text-on-surface-variant uppercase">Budget</div>
-                              <div className="font-display text-xs font-bold text-on-surface">
-                                PKR {(trip.total_budget / 1000).toFixed(0)}k
+                          {(() => {
+                            const tripExpenses = ((trip.preferences as any)?.expenses || []) as any[];
+                            const tripSpend = tripExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+                            return (
+                              <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-surface-container border border-outline-variant/30 text-center">
+                                <div>
+                                  <div className="font-mono text-[9px] text-on-surface-variant uppercase">
+                                    {tripSpend > 0 ? "Spent / Budget" : "Budget"}
+                                  </div>
+                                  <div className="font-display text-xs font-bold text-on-surface">
+                                    {tripSpend > 0
+                                      ? `PKR ${(tripSpend / 1000).toFixed(0)}k / ${(trip.total_budget / 1000).toFixed(0)}k`
+                                      : `PKR ${(trip.total_budget / 1000).toFixed(0)}k`}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="font-mono text-[9px] text-on-surface-variant uppercase">Stops</div>
+                                  <div className="font-display text-xs font-bold text-on-surface">
+                                    {totalStops} POIs
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="font-mono text-[9px] text-on-surface-variant uppercase">Distance</div>
+                                  <div className="font-display text-xs font-bold text-on-surface">
+                                    {getTripDistance(trip)} km
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div>
-                              <div className="font-mono text-[9px] text-on-surface-variant uppercase">Stops</div>
-                              <div className="font-display text-xs font-bold text-on-surface">
-                                {totalStops} POIs
-                              </div>
-                            </div>
-                            <div>
-                              <div className="font-mono text-[9px] text-on-surface-variant uppercase">Distance</div>
-                              <div className="font-display text-xs font-bold text-on-surface">
-                                {getTripDistance(trip)} km
-                              </div>
-                            </div>
-                          </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Action CTAs */}
                         <div className="flex items-center gap-2 pt-5 mt-2 border-t border-outline-variant/40">
-                          <Link
-                            href={`/trips/${trip.id}`}
-                            className="flex-1 py-2 rounded-xl bg-secondary text-white font-display text-xs font-semibold text-center hover:bg-secondary-dark transition-all shadow-xs"
-                          >
-                            View Itinerary
-                          </Link>
+                          {trip.status === "active" ? (
+                            <Link
+                              href={`/trips/${trip.id}?mode=live`}
+                              className="flex-1 py-2 rounded-xl bg-emerald-600 text-white font-display text-xs font-semibold text-center hover:bg-emerald-700 transition-all shadow-xs flex items-center justify-center gap-1"
+                            >
+                              <span>Live HUD</span>
+                              <span className="material-symbols-outlined !text-[14px]">arrow_forward</span>
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/trips/${trip.id}`}
+                              className="flex-1 py-2 rounded-xl bg-secondary text-white font-display text-xs font-semibold text-center hover:bg-secondary-dark transition-all shadow-xs"
+                            >
+                              View Itinerary
+                            </Link>
+                          )}
+
+                          {/* Quick Start / Mark Done Button */}
+                          {trip.status === "planning" || !trip.status ? (
+                            <button
+                              onClick={() => handleStatusChange(trip.id, "active")}
+                              className="px-3 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-all border border-outline-variant/60 text-xs font-semibold"
+                              title="Start Expedition"
+                              type="button"
+                            >
+                              Start
+                            </button>
+                          ) : trip.status === "active" ? (
+                            <button
+                              onClick={() => handleStatusChange(trip.id, "completed")}
+                              className="px-3 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-all border border-outline-variant/60 text-xs font-semibold"
+                              title="Mark Expedition as Completed"
+                              type="button"
+                            >
+                              Complete
+                            </button>
+                          ) : null}
+
                           {activeItin && (
                             <Link
                               href={`/explore?trip_id=${trip.id}`}
-                              className="px-3 py-1 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-all border border-outline-variant/50"
+                              className="px-3 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-all border border-outline-variant/60 flex items-center justify-center"
                               title="View on Smart Map"
                             >
                               <span className="material-symbols-outlined !text-[16px] text-secondary">map</span>
@@ -615,7 +840,7 @@ export default function TripsPage() {
                           )}
                           <button
                             onClick={() => handleDeleteTrip(trip.id)}
-                            className="px-3 py-1 rounded-xl bg-surface-container text-red-600 hover:bg-surface-container-high transition-all border border-outline-variant/50"
+                            className="px-3 py-2 rounded-xl bg-surface-container text-red-600 hover:bg-surface-container-high transition-all border border-outline-variant/60 flex items-center justify-center"
                             title="Delete trip"
                             type="button"
                           >

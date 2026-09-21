@@ -163,6 +163,15 @@ export interface Itinerary {
   days: ItineraryDay[];
 }
 
+export interface TripExpense {
+  id: string;
+  category: string;
+  amount: number;
+  notes?: string;
+  day_number?: number;
+  timestamp: string;
+}
+
 export interface Trip {
   id: string;
   user_id: string;
@@ -171,7 +180,9 @@ export interface Trip {
   duration_days: number;
   total_budget: number;
   pace: "relaxed" | "moderate" | "packed";
+  status: "planning" | "active" | "completed" | "cancelled";
   start_date?: string;
+  preferences?: Record<string, any>;
   active_itinerary?: Itinerary;
   created_at: string;
 }
@@ -190,6 +201,18 @@ export interface ReoptimizePayload {
   new_total_budget?: number;
   new_duration_days?: number;
   new_pace?: "relaxed" | "moderate" | "packed";
+}
+
+export interface TripCheckInPayload {
+  item_id: string;
+  is_visited: boolean;
+}
+
+export interface TripExpensePayload {
+  category: string;
+  amount: number;
+  notes?: string;
+  day_number?: number;
 }
 
 export interface RAGSource {

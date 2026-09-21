@@ -176,3 +176,99 @@ async def test_add_and_remove_stop(async_client: AsyncClient) -> None:
     day1_rem = next(d for d in rem_trip_data["active_itinerary"]["days"] if d["day_number"] == 1)
     assert not any(it["id"] == item_id for it in day1_rem["items"])
 
+
+@pytest.mark.asyncio
+async def test_trip_status_checkin_and_expenses(async_client: AsyncClient) -> None:
+    """Test updating trip status, toggling stop check-in, and logging expenses."""
+    headers, city_id = await _get_auth_headers_and_city(async_client)
+
+    # 1. Create a trip
+    create_res = await async_client.post(
+        "/api/v1/trips",
+        headers=headers,
+        json={
+            "city_id": city_id,
+            "title": "Live Expedition Test",
+            "duration_days": 2,
+            "total_budget": 50000,
+            "pace": "moderate",
+        },
+    )
+    assert create_res.status_code == 201
+    trip_data = create_res.json()
+    trip_id = trip_data["id"]
+    assert trip_data["status"] == "planning"
+
+    # 2. Update status to active (Start Expedition)
+    status_res = await async_client.patch(
+        f"/api/v1/trips/{trip_id}/status",
+        headers=headers,
+        json={"status": "active"},
+    )
+    assert status_res.status_code == 200
+    assert status_res.json()["status"] == "active"
+
+    # 3. Add a place to Day 1
+    from app.models.place import Place, Category
+    async with TestingSessionLocal() as db:
+        cat = Category(name=f"Checkin-{uuid.uuid4().hex[:6]}", slug=f"checkin-{uuid.uuid4().hex[:6]}")
+        db.add(cat)
+        await db.flush()
+        place = Place(
+            city_id=uuid.UUID(city_id),
+            category_id=cat.id,
+            name=f"Scenic Spot {uuid.uuid4().hex[:4]}",
+            slug=f"scenic-spot-{uuid.uuid4().hex[:4]}",
+            latitude=31.55,
+            longitude=74.35,
+            estimated_cost_max=1200,
+            popularity_score=0.9,
+        )
+        db.add(place)
+        await db.commit()
+        place_id = str(place.id)
+
+    add_res = await async_client.post(
+        f"/api/v1/trips/{trip_id}/stops",
+        headers=headers,
+        json={"place_id": place_id, "preferred_day_number": 1},
+    )
+    assert add_res.status_code == 200
+    item_id = add_res.json()["active_itinerary"]["days"][0]["items"][0]["id"]
+
+    # 4. Check-in stop
+    checkin_res = await async_client.post(
+        f"/api/v1/trips/{trip_id}/checkin",
+        headers=headers,
+        json={"item_id": item_id, "is_visited": True},
+    )
+    assert checkin_res.status_code == 200
+    prefs = checkin_res.json()["preferences"]
+    assert item_id in prefs.get("visited_stops", [])
+
+    # 5. Log in-trip expense
+    exp_res = await async_client.post(
+        f"/api/v1/trips/{trip_id}/expenses",
+        headers=headers,
+        json={
+            "category": "Fuel",
+            "amount": 3500.0,
+            "notes": "Highway fuel fill-up",
+            "day_number": 1,
+        },
+    )
+    assert exp_res.status_code == 200
+    exp_prefs = exp_res.json()["preferences"]
+    assert len(exp_prefs.get("expenses", [])) == 1
+    expense_id = exp_prefs["expenses"][0]["id"]
+    assert exp_prefs["expenses"][0]["amount"] == 3500.0
+
+    # 6. Delete expense
+    del_exp_res = await async_client.delete(
+        f"/api/v1/trips/{trip_id}/expenses/{expense_id}",
+        headers=headers,
+    )
+    assert del_exp_res.status_code == 200
+    assert len(del_exp_res.json()["preferences"].get("expenses", [])) == 0
+
+

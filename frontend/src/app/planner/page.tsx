@@ -28,42 +28,42 @@ const POPULAR_ORIGIN_HUBS = [
 
 const QUICK_TEMPLATES = [
   {
-    label: "🍂 Hunza Autumn Peak (5D)",
+    label: "Hunza Autumn Peak (5D)",
     fit: "98% Fit",
     destName: "Hunza Valley & Gojal, Gilgit-Baltistan",
     days: 5,
     budget: 55000,
   },
   {
-    label: "❄️ Skardu Glacial Trek (7D)",
+    label: "Skardu Glacial Trek (7D)",
     fit: "95% Fit",
     destName: "Skardu & Deosai Plains, Gilgit-Baltistan",
     days: 7,
     budget: 85000,
   },
   {
-    label: "🏰 Bahawalpur & Cholistan Forts (3D)",
+    label: "Bahawalpur & Cholistan Forts (3D)",
     fit: "99% Fit",
     destName: "Bahawalpur & Cholistan, Punjab",
     days: 3,
     budget: 35000,
   },
   {
-    label: "🕌 Lahore Heritage Trail (3D)",
+    label: "Lahore Heritage Trail (3D)",
     fit: "96% Fit",
     destName: "Lahore, Punjab",
     days: 3,
     budget: 32000,
   },
   {
-    label: "🌊 Makran Coastal Run (4D)",
+    label: "Makran Coastal Run (4D)",
     fit: "94% Fit",
     destName: "Gwadar & Makran Coast, Balochistan",
     days: 4,
     budget: 48000,
   },
   {
-    label: "🌲 Swat & Kalam Valleys (4D)",
+    label: "Swat & Kalam Valleys (4D)",
     fit: "97% Fit",
     destName: "Swat & Kalam Emerald Valleys, Khyber Pakhtunkhwa",
     days: 4,
@@ -1044,13 +1044,13 @@ function PlannerContent() {
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-secondary/15 via-secondary-container/40 to-tertiary-container/50 hover:from-secondary/25 text-on-surface border border-secondary/30 font-semibold text-xs transition-all shadow-xs group/btn cursor-pointer"
                         type="button"
                       >
-                        <span className="text-tertiary font-bold group-hover/btn:rotate-12 transition-transform">
-                          ✨
+                        <span className="material-symbols-outlined text-sm text-secondary group-hover/btn:rotate-12 transition-transform">
+                          auto_awesome
                         </span>
                         <span>
                           Surprise Me{" "}
                           <span className="font-normal text-on-surface-variant">
-                            (AI Curated Valleys)
+                            (Curated Valleys)
                           </span>
                         </span>
                       </button>
@@ -1663,7 +1663,7 @@ function PlannerContent() {
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-lg group-hover:rotate-12 transition-transform">
-                      ✨
+                      <span className="material-symbols-outlined text-xl">auto_awesome</span>
                     </span>
                     <div className="text-left">
                       <span className="font-display text-base sm:text-lg font-bold tracking-tight block">
@@ -2011,7 +2011,10 @@ function PlannerContent() {
                   className="w-full text-left p-3 rounded-xl hover:bg-surface-container-low transition-colors flex items-center justify-between text-on-surface cursor-pointer"
                 >
                   <span className="text-xs sm:text-sm font-semibold">{dest}</span>
-                  <span className="text-xs text-secondary font-bold">Select ➔</span>
+                  <span className="text-xs text-secondary font-bold flex items-center gap-1">
+                    <span>Select</span>
+                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </span>
                 </button>
               ))}
             </div>

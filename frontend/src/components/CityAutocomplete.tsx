@@ -228,8 +228,9 @@ export default function CityAutocomplete({
                         Focal Hub
                       </span>
                     ) : loc.has_commercial_airport ? (
-                      <span className="text-[9px] font-mono text-emerald-700 font-bold uppercase tracking-wider mt-0.5">
-                        ✈️ Airport
+                      <span className="text-[9px] font-mono text-emerald-700 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-0.5">
+                        <span className="material-symbols-outlined !text-[11px]">flight</span>
+                        <span>Airport</span>
                       </span>
                     ) : null}
                   </div>
