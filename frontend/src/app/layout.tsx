@@ -22,8 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 import StructuredData from "@/components/StructuredData";
-
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://wanderai.travel").replace(/\/+$/, "");
+import { SITE_URL } from "@/lib/siteConfig";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

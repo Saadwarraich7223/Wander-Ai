@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import StructuredData from "@/components/StructuredData";
-
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://wanderai.travel").replace(/\/+$/, "");
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
+import { SITE_URL, API_BASE_URL } from "@/lib/siteConfig";
 
 const FALLBACK_PLACES: Record<string, any> = {
   "hunza-express": {

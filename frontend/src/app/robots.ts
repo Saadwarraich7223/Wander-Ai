@@ -1,6 +1,5 @@
 import { MetadataRoute } from "next";
-
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://wanderai.travel").replace(/\/+$/, "");
+import { SITE_URL } from "@/lib/siteConfig";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -14,6 +13,7 @@ export default function robots(): MetadataRoute.Robots {
           "/explore",
           "/planner",
           "/recommendations",
+          "/assistant",
         ],
         disallow: [
           "/admin",
@@ -22,10 +22,6 @@ export default function robots(): MetadataRoute.Robots {
           "/dashboard/*",
           "/profile",
           "/profile/*",
-          "/assistant",
-          "/assistant/*",
-          "/login",
-          "/register",
           "/trips",
           "/trips/*",
           "/api/*",
