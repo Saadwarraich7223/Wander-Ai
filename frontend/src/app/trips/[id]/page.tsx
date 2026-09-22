@@ -295,7 +295,7 @@ export default function TripDetailPage() {
 
     try {
       const res = await aiApi.chat({ message: userMsg, trip_id: tripId });
-      setConciergeChat((prev) => [...prev, { role: "assistant", text: res.content || "Got it! Your itinerary has been updated with those preferences." }]);
+      setConciergeChat((prev) => [...prev, { role: "assistant", text: res.response || (res as any).content || "Got it! Your itinerary has been updated with those preferences." }]);
     } catch {
       setConciergeChat((prev) => [...prev, { role: "assistant", text: "The route corridor checkposts report clear roads with optimal travel conditions. All regional coordinates are verified." }]);
     } finally {
@@ -313,7 +313,7 @@ export default function TripDetailPage() {
 
     try {
       const res = await aiApi.chat({ message: userMsg, trip_id: tripId });
-      setDrawerChat((prev) => [...prev, { role: "assistant", text: res.content || "I have analyzed your requested adjustment. Check your itinerary timeline for updated stops!" }]);
+      setDrawerChat((prev) => [...prev, { role: "assistant", text: res.response || (res as any).content || "I have analyzed your requested adjustment. Check your itinerary timeline for updated stops!" }]);
     } catch {
       setDrawerChat((prev) => [...prev, { role: "assistant", text: "Understood! Your regional culinary stops and route pacing preferences have been calibrated." }]);
     } finally {
