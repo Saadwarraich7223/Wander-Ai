@@ -1,12 +1,11 @@
 /**
  * Centralized Site Configuration
- * Ensures canonical metadata, sitemap.xml, robots.txt, and OpenGraph URLs
- * always resolve to the live domain (https://wander-ai-delta.vercel.app).
+ * Strictly fixes canonical metadata, sitemap.xml, robots.txt, and OpenGraph URLs
+ * to the production domain (https://wander-ai-delta.vercel.app).
  */
 
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
   "https://wander-ai-delta.vercel.app"
 ).replace(/\/+$/, "");
 
