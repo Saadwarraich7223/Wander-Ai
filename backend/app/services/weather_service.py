@@ -17,12 +17,26 @@ class WeatherService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_city_weather(self, city_id: uuid.UUID) -> Dict[str, Any]:
+    async def get_city_weather(self, city_id: Any) -> Dict[str, Any]:
         """Fetch current weather, 5-day forecast, and pass clearance for a destination city."""
-        res = await self.db.execute(select(City).filter(City.id == city_id))
-        city = res.scalar_one_or_none()
+        city = None
+        c_uuid = None
+        if isinstance(city_id, uuid.UUID):
+            c_uuid = city_id
+        elif isinstance(city_id, str):
+            try:
+                c_uuid = uuid.UUID(city_id)
+            except ValueError:
+                c_uuid = None
 
-        city_name = city.name if city else "Destination"
+        if c_uuid:
+            res = await self.db.execute(select(City).filter(City.id == c_uuid))
+            city = res.scalar_one_or_none()
+        elif isinstance(city_id, str):
+            res = await self.db.execute(select(City).filter((City.slug == city_id) | (City.name.ilike(f"%{city_id}%"))))
+            city = res.scalar_one_or_none()
+
+        city_name = city.name if city else (str(city_id) if isinstance(city_id, str) and not c_uuid else "Destination")
         name_lower = city_name.lower()
         lat = city.latitude if city and city.latitude else 31.5
 

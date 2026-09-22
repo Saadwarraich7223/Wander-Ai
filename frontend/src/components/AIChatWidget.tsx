@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import FormattedMessage from "@/components/FormattedMessage";
 import { aiApi } from "@/lib/api";
 import { ChatMessage } from "@/types";
 
@@ -136,7 +137,7 @@ export default function AIChatWidget() {
                         : "bg-primary text-white font-medium ml-auto shadow-xs"
                       }`}
                   >
-                    <p className="whitespace-pre-line">{msg.content}</p>
+                    <FormattedMessage content={msg.content} isUser={!isAssistant} />
 
                     {/* Sources / Citations */}
                     {msg.sources && msg.sources.length > 0 && (

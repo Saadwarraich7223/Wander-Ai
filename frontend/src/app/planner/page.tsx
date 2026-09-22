@@ -148,12 +148,16 @@ function PlannerContent() {
 
   // Handle incoming query params
   useEffect(() => {
+    const destParam = searchParams.get("destination");
+    const originParam = searchParams.get("origin");
+    const budgetParam = searchParams.get("budget");
+    const paceParam = searchParams.get("pace");
     const pId = searchParams.get("place_id");
     const pName = searchParams.get("place_name");
     const cId = searchParams.get("city_id");
     const cName = searchParams.get("city_name");
     const daysParam = searchParams.get("days");
-    const cohortParam = searchParams.get("cohort");
+    const cohortParam = searchParams.get("cohort") || searchParams.get("travel_style");
 
     if (pId && pName) {
       setPreselectedPlace({
@@ -167,6 +171,27 @@ function PlannerContent() {
       setDestination(destString);
       const loc = findPakistanLocation(cName || pName);
       if (loc) setDestinationLocation(loc);
+    } else if (destParam) {
+      setDestination(destParam);
+      const loc = findPakistanLocation(destParam);
+      if (loc) setDestinationLocation(loc);
+    }
+
+    if (originParam) {
+      setOriginCity(originParam);
+      const loc = findPakistanLocation(originParam);
+      if (loc) setOriginLocation(loc);
+    }
+
+    if (budgetParam) {
+      const parsedBudget = parseInt(budgetParam, 10);
+      if (!isNaN(parsedBudget) && parsedBudget > 0) {
+        setBudget(parsedBudget);
+      }
+    }
+
+    if (paceParam && ["relaxed", "balanced", "intensive"].includes(paceParam)) {
+      setPace(paceParam as "relaxed" | "balanced" | "intensive");
     }
 
     if (daysParam) {

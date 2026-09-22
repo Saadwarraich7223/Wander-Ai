@@ -11,6 +11,7 @@ from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.trips import router as trips_router
 from app.api.v1.users import router as users_router
 from app.api.v1.ai import router as ai_router
+from app.api.v1.weather import router as weather_router
 
 api_router = APIRouter(prefix="/v1")
 
@@ -23,4 +24,5 @@ api_router.include_router(interactions_router)
 api_router.include_router(recommendations_router)
 api_router.include_router(trips_router)
 api_router.include_router(ai_router)
+api_router.include_router(weather_router)
 

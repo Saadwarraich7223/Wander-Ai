@@ -83,9 +83,7 @@ export default function TripDetailPage() {
   const [reoptimizing, setReoptimizing] = useState(false);
 
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
-  const [swapModalOpen, setSwapModalOpen] = useState(false);
-  const [swapReason, setSwapReason] = useState<string>("gentle");
-  const [swapUpdating, setSwapUpdating] = useState(false);
+  const [swappingStop, setSwappingStop] = useState<{ itemId: string; placeName: string; dayNumber: number } | null>(null);
 
   // AI Concierge Chat State
   const [conciergeMessage, setConciergeMessage] = useState("");
@@ -323,13 +321,26 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleConfirmSwap = () => {
-    setSwapUpdating(true);
-    setTimeout(() => {
-      setSwapUpdating(false);
-      setSwapModalOpen(false);
-      alert("Afternoon itinerary re-synthesized for gentle cultural pacing!");
-    }, 600);
+  const handleExecuteSwap = async (newPlaceId: string) => {
+    if (!swappingStop) return;
+    try {
+      setAddingPlaceId(newPlaceId);
+      // 1. Add new candidate stop to the day
+      await tripsApi.addStop(tripId, {
+        place_id: newPlaceId,
+        preferred_day_number: swappingStop.dayNumber,
+      });
+      // 2. Remove the old stop
+      const updatedTrip = await tripsApi.removeStop(tripId, swappingStop.itemId);
+      setTrip(updatedTrip);
+      setExpandedDays((prev) => new Set([...prev, swappingStop.dayNumber]));
+      setSwappingStop(null);
+      setActiveAddDay(null);
+    } catch (err: any) {
+      alert("Failed to swap stop: " + getErrorMessage(err, "Could not swap stop in itinerary"));
+    } finally {
+      setAddingPlaceId(null);
+    }
   };
 
   // Icon selector based on category / place name
@@ -1575,6 +1586,23 @@ export default function TripDetailPage() {
                                                 </a>
 
                                                 <button
+                                                  onClick={() => {
+                                                    setActiveAddDay(day.day_number);
+                                                    setSwappingStop({
+                                                      itemId: item.id,
+                                                      placeName: item.place.name,
+                                                      dayNumber: day.day_number,
+                                                    });
+                                                  }}
+                                                  className="inline-flex items-center gap-1 text-xs text-on-surface-variant hover:text-secondary hover:bg-secondary/10 px-2 py-1 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-secondary/20"
+                                                  type="button"
+                                                  title="Swap with an alternative place"
+                                                >
+                                                  <span className="material-symbols-outlined text-sm text-secondary">swap_horiz</span>
+                                                  <span className="text-[11px] text-secondary font-medium">Swap</span>
+                                                </button>
+
+                                                <button
                                                   onClick={() => handleRemoveStop(item.id, item.place.name, day.day_number)}
                                                   disabled={isDeleting}
                                                   className="inline-flex items-center gap-1 text-xs text-on-surface-variant hover:text-error hover:bg-error/10 px-2 py-1 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-error/20"
@@ -1610,7 +1638,14 @@ export default function TripDetailPage() {
                                               </div>
                                             </div>
                                             <button
-                                              onClick={() => setSwapModalOpen(true)}
+                                              onClick={() => {
+                                                setActiveAddDay(day.day_number);
+                                                setSwappingStop({
+                                                  itemId: item.id,
+                                                  placeName: item.place.name,
+                                                  dayNumber: day.day_number,
+                                                });
+                                              }}
                                               className="px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto border border-outline-variant/40"
                                               type="button"
                                             >
@@ -2065,95 +2100,7 @@ export default function TripDetailPage() {
         </div>
       </main>
 
-      {/* ==================== CONTEXTUAL AI MODAL: 'Change My Afternoon' ==================== */}
-      {swapModalOpen && (
-        <div className="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm flex items-center justify-center p-unit-4">
-          <div className="bg-surface-container-lowest w-full max-w-lg rounded-xl p-unit-8 shadow-xl flex flex-col gap-unit-6 relative animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-unit-3">
-                <div className="w-9 h-9 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-base">auto_awesome</span>
-                </div>
-                <div>
-                  <h3 className="font-headline-md text-headline-md text-on-surface">Re-Synthesize Afternoon</h3>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Day 1 • {destLoc.name} Sector</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSwapModalOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
-            </div>
 
-            <div className="flex flex-col gap-unit-3">
-              <span className="font-label-md text-label-md text-outline uppercase tracking-wider">Select Adaptive Condition</span>
-
-              <label className="flex items-start gap-unit-3 p-unit-4 rounded-xl bg-surface-container-low hover:bg-surface-container-high cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="swap-reason"
-                  checked={swapReason === "gentle"}
-                  onChange={() => setSwapReason("gentle")}
-                  className="mt-1 text-secondary accent-secondary"
-                />
-                <div className="flex-1">
-                  <div className="font-title-md text-title-md text-on-surface">Lower Energy / Gentle Pacing</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">Replace outdoor walking with local heritage garden tea tasting &amp; artisanal craft workshop.</div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-unit-3 p-unit-4 rounded-xl bg-surface-container-low hover:bg-surface-container-high cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="swap-reason"
-                  checked={swapReason === "weather"}
-                  onChange={() => setSwapReason("weather")}
-                  className="mt-1 text-secondary accent-secondary"
-                />
-                <div className="flex-1">
-                  <div className="font-title-md text-title-md text-on-surface">Inclement / Overcast Weather</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">Swap exposed viewpoint for indoor museum gallery &amp; historical exhibition in {destLoc.name}.</div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-unit-3 p-unit-4 rounded-xl bg-surface-container-low hover:bg-surface-container-high cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="swap-reason"
-                  checked={swapReason === "photo"}
-                  onChange={() => setSwapReason("photo")}
-                  className="mt-1 text-secondary accent-secondary"
-                />
-                <div className="flex-1">
-                  <div className="font-title-md text-title-md text-on-surface">Photography Priority</div>
-                  <div className="font-body-sm text-body-sm text-on-surface-variant">Advance to golden hour vantage point 1.5 hours earlier for soft pre-sunset lighting.</div>
-                </div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-end gap-unit-3 pt-unit-2">
-              <button
-                onClick={() => setSwapModalOpen(false)}
-                className="px-unit-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low font-title-md text-title-md transition-colors cursor-pointer"
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={swapUpdating}
-                onClick={handleConfirmSwap}
-                className="flex items-center gap-unit-2 px-unit-5 py-2 rounded-lg bg-secondary text-on-secondary hover:bg-secondary-dark font-title-md text-title-md transition-all shadow-sm cursor-pointer disabled:opacity-60"
-                type="button"
-              >
-                <span>{swapUpdating ? "Updating Route..." : "Synthesize Changes"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ==================== SLIDE-OVER AI EDIT CANVAS DRAWER ==================== */}
       <div
@@ -2232,19 +2179,28 @@ export default function TripDetailPage() {
             <div className="flex items-center justify-between pb-3 border-b border-outline-variant/60">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-secondary text-white flex items-center justify-center shadow-xs">
-                  <span className="material-symbols-outlined text-xl">add_location_alt</span>
+                  <span className="material-symbols-outlined text-xl">
+                    {swappingStop ? "swap_horiz" : "add_location_alt"}
+                  </span>
                 </div>
                 <div>
                   <h3 className="font-display font-bold text-base sm:text-lg text-on-surface">
-                    Add Stop to Day {activeAddDay}
+                    {swappingStop
+                      ? `Swap "${swappingStop.placeName}" (Day ${swappingStop.dayNumber})`
+                      : `Add Stop to Day ${activeAddDay}`}
                   </h3>
                   <p className="text-xs text-on-surface-variant">
-                    Browse and select from verified attractions, viewpoints, stays, and dining in {destLoc.name}
+                    {swappingStop
+                      ? `Select a replacement destination to re-calibrate this stop on Day ${swappingStop.dayNumber}`
+                      : `Browse and select from verified attractions, viewpoints, stays, and dining in ${destLoc.name}`}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setActiveAddDay(null)}
+                onClick={() => {
+                  setActiveAddDay(null);
+                  setSwappingStop(null);
+                }}
                 className="w-9 h-9 rounded-xl hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer"
                 type="button"
               >
@@ -2439,19 +2395,29 @@ export default function TripDetailPage() {
 
                           <button
                             disabled={isAdding}
-                            onClick={() => handleAddStop(place.id, activeAddDay)}
+                            onClick={() =>
+                              swappingStop
+                                ? handleExecuteSwap(place.id)
+                                : handleAddStop(place.id, activeAddDay)
+                            }
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
                             type="button"
                           >
                             {isAdding ? (
                               <>
                                 <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                <span>Adding...</span>
+                                <span>{swappingStop ? "Swapping..." : "Adding..."}</span>
                               </>
                             ) : (
                               <>
-                                <span className="material-symbols-outlined text-xs">add</span>
-                                <span>Add to Day {activeAddDay}</span>
+                                <span className="material-symbols-outlined text-xs">
+                                  {swappingStop ? "swap_horiz" : "add"}
+                                </span>
+                                <span>
+                                  {swappingStop
+                                    ? "Replace with This"
+                                    : `Add to Day ${activeAddDay}`}
+                                </span>
                               </>
                             )}
                           </button>
@@ -2469,7 +2435,10 @@ export default function TripDetailPage() {
                 {modalCandidatePlaces.length} candidate location{modalCandidatePlaces.length !== 1 ? "s" : ""} available
               </span>
               <button
-                onClick={() => setActiveAddDay(null)}
+                onClick={() => {
+                  setActiveAddDay(null);
+                  setSwappingStop(null);
+                }}
                 className="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold transition-colors cursor-pointer"
                 type="button"
               >

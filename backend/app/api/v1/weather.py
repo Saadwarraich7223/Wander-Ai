@@ -13,7 +13,7 @@ router = APIRouter(prefix="/weather", tags=["Weather"])
 
 @router.get("/{city_id}", status_code=status.HTTP_200_OK)
 async def get_weather_forecast(
-    city_id: uuid.UUID,
+    city_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Get live/forecast weather context and multipliers for a city."""

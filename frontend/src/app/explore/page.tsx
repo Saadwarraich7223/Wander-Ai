@@ -378,7 +378,29 @@ function SmartMapContent() {
   // ── Trip Mode (from /explore?trip_id=xxx) ──────────────────────────
   const [activeTripData, setActiveTripData] = useState<Trip | null>(null);
   const [tripModeLoading, setTripModeLoading] = useState(false);
+  const [selectedTripDay, setSelectedTripDay] = useState<number | "all">("all");
   const tripId = searchParams.get("trip_id");
+
+  // Add to Trip Modal State
+  const [addToTripModalPlace, setAddToTripModalPlace] = useState<POI | null>(null);
+  const [userTrips, setUserTrips] = useState<Trip[]>([]);
+  const [selectedTargetTripId, setSelectedTargetTripId] = useState<string>("");
+  const [selectedTargetDay, setSelectedTargetDay] = useState<number>(1);
+  const [isAddingToTrip, setIsAddingToTrip] = useState(false);
+
+  // Read destination / region query params when not in trip mode
+  useEffect(() => {
+    const destParam = searchParams.get("destination") || searchParams.get("region") || searchParams.get("q");
+    if (destParam && !tripId) {
+      const lower = destParam.toLowerCase();
+      const matchedRegion = Object.keys(DEFAULT_REGIONS).find((k) => lower.includes(k));
+      if (matchedRegion) {
+        setSelectedRegionId(matchedRegion);
+      } else {
+        setSearchQuery(destParam);
+      }
+    }
+  }, [searchParams, tripId]);
 
   // Load Metadata on Mount
   useEffect(() => {
@@ -534,14 +556,22 @@ function SmartMapContent() {
         }
       }
 
-      activeTripData.active_itinerary.days.forEach((day) => {
+      const daysToInclude =
+        selectedTripDay === "all"
+          ? activeTripData.active_itinerary.days
+          : activeTripData.active_itinerary.days.filter((d) => d.day_number === selectedTripDay);
+
+      const visitedSet = new Set((activeTripData.preferences?.visited_stops || []).map(String));
+
+      daysToInclude.forEach((day) => {
         day.items.forEach((item) => {
           globalOrder++;
+          const isVisited = visitedSet.has(String(item.id));
           pois.push({
             id: item.place.id,
             name: item.place.name,
             category: item.place.category?.slug?.includes("food") ? "dining" : item.place.category?.slug?.includes("photo") ? "photopoint" : "heritage",
-            match: `Day ${day.day_number} · Stop ${item.item_order + 1}`,
+            match: `Day ${day.day_number} · Stop ${item.item_order + 1}${isVisited ? " (Visited)" : ""}`,
             tagline: `${item.start_time || "09:00"}–${item.end_time || "11:00"} · ${item.place.category?.name || "Attraction"}`,
             hours: `${item.start_time || "09:00"} – ${item.end_time || "18:00"}`,
             price: item.estimated_cost ? `PKR ${item.estimated_cost.toLocaleString()}` : (item.place.estimated_cost_min ? `PKR ${item.place.estimated_cost_min.toLocaleString()}` : "Included"),
@@ -597,7 +627,7 @@ function SmartMapContent() {
     }
 
     return pois;
-  }, [activeTripData, selectedRegionId, backendPlaces, backendCities]);
+  }, [activeTripData, selectedRegionId, backendPlaces, backendCities, selectedTripDay]);
 
 
   const filteredPois = useMemo(
@@ -974,43 +1004,87 @@ function SmartMapContent() {
 
           {!tripModeLoading && activeTripData && (
             <div className="mb-6 pt-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4 bg-secondary/8 border border-secondary/25 rounded-2xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-secondary/15 border border-secondary/25 flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-secondary text-lg">route</span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-secondary font-bold">Trip Mode Active</span>
-                      <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-bold border border-secondary/20">
-                        {activeTripData.active_itinerary?.days?.reduce((a, d) => a + d.items.length, 0) || 0} stops plotted
-                      </span>
+              <div className="flex flex-col gap-4 px-5 py-4 bg-secondary/8 border border-secondary/25 rounded-2xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-secondary/15 border border-secondary/25 flex items-center justify-center flex-shrink-0">
+                      <span className="material-symbols-outlined text-secondary text-lg">route</span>
                     </div>
-                    <p className="font-display font-semibold text-sm text-on-surface mt-0.5 line-clamp-1">
-                      {activeTripData.title}
-                    </p>
-                    <p className="text-xs text-on-surface-variant">
-                      {activeTripData.duration_days} days · PKR {activeTripData.total_budget.toLocaleString()} · {activeTripData.pace} pace
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-secondary font-bold">Trip Mode Active</span>
+                        <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-bold border border-secondary/20">
+                          {activeTripData.active_itinerary?.days?.reduce((a, d) => a + d.items.length, 0) || 0} stops plotted
+                        </span>
+                      </div>
+                      <p className="font-display font-semibold text-sm text-on-surface mt-0.5 line-clamp-1">
+                        {activeTripData.title}
+                      </p>
+                      <p className="text-xs text-on-surface-variant">
+                        {activeTripData.duration_days} days · PKR {activeTripData.total_budget.toLocaleString()} · {activeTripData.pace} pace
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link
+                      href={`/trips/${activeTripData.id}?mode=live`}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary text-white text-xs font-semibold hover:bg-secondary-dark transition-all shadow-xs"
+                    >
+                      <span className="material-symbols-outlined text-sm">navigation</span>
+                      Live HUD
+                    </Link>
+                    <Link
+                      href={`/trips/${activeTripData.id}`}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant text-xs font-semibold text-on-surface hover:bg-surface-container transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm text-secondary">arrow_back</span>
+                      Back to Itinerary
+                    </Link>
+                    <button
+                      onClick={() => router.replace("/explore")}
+                      className="inline-flex items-center gap-1 p-2 rounded-xl bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all"
+                      title="Exit Trip Mode"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Link
-                    href={`/trips/${activeTripData.id}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant text-xs font-semibold text-on-surface hover:bg-surface-container transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm text-secondary">arrow_back</span>
-                    Back to Itinerary
-                  </Link>
-                  <button
-                    onClick={() => router.replace("/explore")}
-                    className="inline-flex items-center gap-1 p-2 rounded-xl bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all"
-                    title="Exit Trip Mode"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-sm">close</span>
-                  </button>
-                </div>
+
+                {/* Day Filter Pills */}
+                {activeTripData.active_itinerary?.days && activeTripData.active_itinerary.days.length > 0 && (
+                  <div className="flex items-center gap-2 pt-3 border-t border-secondary/20 overflow-x-auto scrollbar-none">
+                    <span className="text-xs font-mono font-bold text-secondary uppercase tracking-wider shrink-0 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">calendar_view_day</span>
+                      Stage Filter:
+                    </span>
+                    <button
+                      onClick={() => setSelectedTripDay("all")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                        selectedTripDay === "all"
+                          ? "bg-secondary text-white shadow-xs font-bold"
+                          : "bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-outline-variant/60"
+                      }`}
+                      type="button"
+                    >
+                      All Days ({activeTripData.active_itinerary.days.reduce((a, d) => a + d.items.length, 0)})
+                    </button>
+                    {activeTripData.active_itinerary.days.map((day) => (
+                      <button
+                        key={day.day_number}
+                        onClick={() => setSelectedTripDay(day.day_number)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                          selectedTripDay === day.day_number
+                            ? "bg-secondary text-white shadow-xs font-bold"
+                            : "bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-outline-variant/60"
+                        }`}
+                        type="button"
+                      >
+                        Day {day.day_number} ({day.items.length} stops)
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1575,6 +1649,24 @@ function SmartMapContent() {
                             <span>Direct Path</span>
                           </button>
                           <button
+                            onClick={async () => {
+                              setAddToTripModalPlace(selectedPoi);
+                              try {
+                                const trips = await tripsApi.list();
+                                setUserTrips(trips);
+                                if (trips.length > 0) {
+                                  setSelectedTargetTripId(trips[0].id);
+                                }
+                              } catch (e) {}
+                            }}
+                            className="px-3 py-1.5 sm:py-2 rounded-xl border border-secondary text-secondary hover:bg-secondary/10 text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                            type="button"
+                            title="Add this place to an existing expedition"
+                          >
+                            <span className="material-symbols-outlined text-sm">playlist_add</span>
+                            <span>+ Trip</span>
+                          </button>
+                          <button
                             onClick={() => toggleRouteWaypoint(selectedPoi.id)}
                             className={`px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
                               routeWaypoints.includes(selectedPoi.id)
@@ -1583,7 +1675,7 @@ function SmartMapContent() {
                             }`}
                             type="button"
                           >
-                            {routeWaypoints.includes(selectedPoi.id) ? "In Route" : "+ Add"}
+                            {routeWaypoints.includes(selectedPoi.id) ? "In Route" : "+ Walk"}
                           </button>
                         </div>
                       </div>
@@ -1770,6 +1862,130 @@ function SmartMapContent() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== ADD PLACE TO TRIP MODAL ==================== */}
+      {addToTripModalPlace && (
+        <div className="fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-2xl p-6 shadow-2xl border border-outline-variant/60 flex flex-col gap-4 relative">
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/60">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-secondary text-white flex items-center justify-center shadow-xs">
+                  <span className="material-symbols-outlined text-xl">playlist_add</span>
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base text-on-surface">
+                    Add to Expedition
+                  </h3>
+                  <p className="text-xs text-on-surface-variant line-clamp-1">
+                    {addToTripModalPlace.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAddToTripModalPlace(null)}
+                className="w-8 h-8 rounded-lg hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {userTrips.length === 0 ? (
+              <div className="py-6 text-center text-xs text-on-surface-variant flex flex-col items-center gap-3">
+                <span className="material-symbols-outlined text-3xl text-outline">explore_off</span>
+                <p>No active expeditions found. Create one in the Planner first!</p>
+                <Link
+                  href="/planner"
+                  className="px-4 py-2 rounded-xl bg-secondary text-white font-bold text-xs shadow-xs hover:bg-secondary-dark transition-all"
+                >
+                  Go to Planner
+                </Link>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!selectedTargetTripId || !addToTripModalPlace) return;
+                  setIsAddingToTrip(true);
+                  try {
+                    await tripsApi.addStop(selectedTargetTripId, {
+                      place_id: addToTripModalPlace.id,
+                      preferred_day_number: selectedTargetDay,
+                    });
+                    alert(`"${addToTripModalPlace.name}" added to Day ${selectedTargetDay}!`);
+                    setAddToTripModalPlace(null);
+                  } catch (err: any) {
+                    alert("Failed to add stop: " + getErrorMessage(err, "Could not add stop to trip"));
+                  } finally {
+                    setIsAddingToTrip(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface mb-1">
+                    Select Target Expedition
+                  </label>
+                  <select
+                    value={selectedTargetTripId}
+                    onChange={(e) => {
+                      setSelectedTargetTripId(e.target.value);
+                      setSelectedTargetDay(1);
+                    }}
+                    className="w-full bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                  >
+                    {userTrips.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.duration_days} Days · {t.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface mb-1">
+                    Select Itinerary Day
+                  </label>
+                  {(() => {
+                    const targetTrip = userTrips.find((t) => t.id === selectedTargetTripId);
+                    const numDays = targetTrip?.duration_days || 3;
+                    return (
+                      <select
+                        value={selectedTargetDay}
+                        onChange={(e) => setSelectedTargetDay(Number(e.target.value))}
+                        className="w-full bg-surface-container-low border border-outline-variant/60 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
+                      >
+                        {Array.from({ length: numDays }, (_, i) => i + 1).map((d) => (
+                          <option key={d} value={d}>
+                            Day {d}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAddToTripModalPlace(null)}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isAddingToTrip}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-secondary hover:bg-secondary-dark text-white font-display font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {isAddingToTrip ? "Adding Stop..." : "Confirm Add"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

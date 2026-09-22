@@ -354,7 +354,7 @@ export default function RecommendationsPage() {
               ].filter(Boolean),
               precip: effectiveScenario === "snow" ? "12.4mm Snow" : effectiveScenario === "rain" ? "8.2mm Rain" : "0.00mm",
               clarity: effectiveScenario === "snow" ? "7.8 / 10" : "9.6 / 10",
-              plannerUrl: `/planner?destination=${encodeURIComponent(p.name)}&place_id=${p.id}`,
+              plannerUrl: `/planner?destination=${encodeURIComponent(matchedCity?.name ? `${p.name}, ${matchedCity.name}` : p.name)}&place_id=${p.id}&place_name=${encodeURIComponent(p.name)}&city_id=${p.city_id || ""}&city_name=${encodeURIComponent(matchedCity?.name || "")}&algorithm=${activeLens}`,
             };
           });
 

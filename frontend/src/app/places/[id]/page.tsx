@@ -131,8 +131,12 @@ export default function PlaceDetailPage() {
 
         if (placeRes.city_id) {
           api.get(`/weather/${placeRes.city_id}`)
-            .then((res) => { if (active) setWeatherData(res.data); })
-            .catch(() => {});
+            .then((res) => { if (active && res.data) setWeatherData(res.data); })
+            .catch(() => {
+              api.get(`/cities/${placeRes.city_id}/weather`)
+                .then((res) => { if (active && res.data) setWeatherData(res.data); })
+                .catch(() => {});
+            });
         }
 
         const [tripList, siblingRes] = await Promise.all([
@@ -607,6 +611,40 @@ export default function PlaceDetailPage() {
                     Route Clearance: {weatherData.pass_clearance}
                   </span>
                 )}
+              </div>
+            </div>
+          )}
+          {weatherData?.forecast && Array.isArray(weatherData.forecast) && (
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm">wb_sunny</span>
+                  5-Day Live Atmospheric Forecast
+                </span>
+                <span className="text-[11px] font-mono text-on-surface-variant font-semibold">
+                  PMD Synchronized
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                {weatherData.forecast.map((f: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/40 flex flex-col items-center text-center gap-1"
+                  >
+                    <span className="text-[11px] font-mono font-bold text-on-surface-variant">
+                      {f.day}
+                    </span>
+                    <span className="material-symbols-outlined text-xl text-secondary my-0.5">
+                      {f.condition === "rain" ? "rainy" : f.condition === "snow" ? "ac_unit" : f.condition === "partly_cloudy" ? "partly_cloudy_day" : "wb_sunny"}
+                    </span>
+                    <span className="text-xs font-bold text-on-surface">
+                      {f.temp_max}°C <span className="text-[10px] text-on-surface-variant font-normal">/ {f.temp_min}°C</span>
+                    </span>
+                    <span className="text-[10px] text-on-surface-variant capitalize">
+                      {f.condition?.replace("_", " ")}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

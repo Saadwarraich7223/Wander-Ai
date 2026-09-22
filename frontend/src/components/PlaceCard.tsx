@@ -13,6 +13,7 @@ interface PlaceCardProps {
   className?: string;
   imageClassName?: string;
   prominent?: boolean;
+  onAddToTrip?: (place: PlaceSummary) => void;
 }
 
 export function formatPrice(place: PlaceSummary): string {
@@ -78,11 +79,13 @@ function CompactCard({
   regionName,
   cityName,
   imageClassName,
+  onAddToTrip,
 }: {
   place: PlaceSummary;
   regionName?: string;
   cityName?: string;
   imageClassName?: string;
+  onAddToTrip?: (place: PlaceSummary) => void;
 }) {
   const [saved, setSaved] = useState(false);
   const match = matchPercent(place);
@@ -179,12 +182,25 @@ function CompactCard({
             <span className="material-symbols-outlined text-sm">schedule</span>
             {formatDays(place.average_visit_duration_minutes)}
           </span>
-          <Link
-            href={detailHref}
-            className="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all cursor-pointer"
-          >
-            Explore
-          </Link>
+          <div className="flex items-center gap-1.5">
+            {onAddToTrip && (
+              <button
+                onClick={() => onAddToTrip(place)}
+                className="px-2.5 py-1.5 rounded-lg bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all cursor-pointer flex items-center gap-1"
+                type="button"
+                title="Add to Itinerary"
+              >
+                <span className="material-symbols-outlined text-[14px]">add_location_alt</span>
+                <span>+ Trip</span>
+              </button>
+            )}
+            <Link
+              href={detailHref}
+              className="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all cursor-pointer"
+            >
+              Explore
+            </Link>
+          </div>
         </div>
       </div>
     </article>
@@ -283,7 +299,19 @@ function CoverCard({
   );
 }
 
-function FeaturedCard({ place, regionName, cityName, imageClassName }: { place: PlaceSummary; regionName?: string; cityName?: string; imageClassName?: string }) {
+function FeaturedCard({
+  place,
+  regionName,
+  cityName,
+  imageClassName,
+  onAddToTrip,
+}: {
+  place: PlaceSummary;
+  regionName?: string;
+  cityName?: string;
+  imageClassName?: string;
+  onAddToTrip?: (place: PlaceSummary) => void;
+}) {
   const [saved, setSaved] = useState(false);
   const match = matchPercent(place);
   const detailHref = `/places/${place.id}`;
@@ -346,6 +374,17 @@ function FeaturedCard({ place, regionName, cityName, imageClassName }: { place: 
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {onAddToTrip && (
+              <button
+                onClick={() => onAddToTrip(place)}
+                className="px-3.5 py-2 rounded-xl bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
+                type="button"
+                title="Add to Itinerary"
+              >
+                <span className="material-symbols-outlined text-base">add_location_alt</span>
+                <span>+ Trip</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 api
@@ -414,11 +453,12 @@ export default function PlaceCard({
   className,
   imageClassName,
   prominent,
+  onAddToTrip,
 }: PlaceCardProps) {
   if (variant === "featured") {
     return (
       <div className={className}>
-        <FeaturedCard place={place} regionName={regionName} cityName={cityName} imageClassName={imageClassName} />
+        <FeaturedCard place={place} regionName={regionName} cityName={cityName} imageClassName={imageClassName} onAddToTrip={onAddToTrip} />
       </div>
     );
   }
@@ -431,7 +471,7 @@ export default function PlaceCard({
   }
   return (
     <div className={className}>
-      <CompactCard place={place} regionName={regionName} cityName={cityName} imageClassName={imageClassName} />
+      <CompactCard place={place} regionName={regionName} cityName={cityName} imageClassName={imageClassName} onAddToTrip={onAddToTrip} />
     </div>
   );
 }

@@ -173,6 +173,36 @@ export default function PlacesPage() {
   const [sort, setSort] = useState<SortKey>("affinity");
   const [page, setPage] = useState(1);
 
+  // Add to Trip Modal state
+  const [addToTripModalPlace, setAddToTripModalPlace] = useState<PlaceSummary | null>(null);
+  const [selectedTripId, setSelectedTripId] = useState<string>("");
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(1);
+  const [addingStop, setAddingStop] = useState(false);
+  const [addStopError, setAddStopError] = useState<string | null>(null);
+  const [addStopSuccess, setAddStopSuccess] = useState<string | null>(null);
+
+  const handleConfirmAddToTrip = async () => {
+    if (!addToTripModalPlace || !selectedTripId) return;
+    setAddingStop(true);
+    setAddStopError(null);
+    try {
+      await tripsApi.addStop(selectedTripId, {
+        place_id: addToTripModalPlace.id,
+        preferred_day_number: selectedDayIndex,
+      });
+      setAddStopSuccess(`Successfully attached ${addToTripModalPlace.name} to expedition!`);
+      setTimeout(() => {
+        setAddToTripModalPlace(null);
+        setAddStopSuccess(null);
+      }, 1400);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || "Could not attach place to expedition.";
+      setAddStopError(msg);
+    } finally {
+      setAddingStop(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
     async function load() {
@@ -603,6 +633,13 @@ export default function PlacesPage() {
                         place={place}
                         regionName={cityById.get(place.city_id)?.region?.name}
                         cityName={cityById.get(place.city_id)?.name}
+                        onAddToTrip={(p) => {
+                          setAddToTripModalPlace(p);
+                          setSelectedTripId(trips[0]?.id || "");
+                          setSelectedDayIndex(1);
+                          setAddStopError(null);
+                          setAddStopSuccess(null);
+                        }}
                       />
                     ))}
                   </div>
@@ -906,6 +943,144 @@ export default function PlacesPage() {
           )}
         </div>
       </main>
+
+      {/* ADD TO TRIP MODAL */}
+      {addToTripModalPlace && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setAddToTripModalPlace(null)}
+        >
+          <div
+            className="bg-surface-container-lowest rounded-3xl shadow-2xl border border-outline-variant/60 w-full max-w-md overflow-hidden p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-secondary">
+                  Expedition Dispatch
+                </span>
+                <h3 className="font-display text-lg font-bold text-on-surface">
+                  Add to Expedition
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
+                  {addToTripModalPlace.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setAddToTripModalPlace(null)}
+                className="p-1.5 rounded-full hover:bg-surface-container text-on-surface-variant transition-colors"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+
+            {addStopSuccess && (
+              <div className="p-3 bg-secondary/10 border border-secondary/30 rounded-xl text-xs font-semibold text-secondary flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">check_circle</span>
+                <span>{addStopSuccess}</span>
+              </div>
+            )}
+
+            {addStopError && (
+              <div className="p-3 bg-error-container/20 border border-error/30 rounded-xl text-xs font-semibold text-error flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">error</span>
+                <span>{addStopError}</span>
+              </div>
+            )}
+
+            {trips.length === 0 ? (
+              <div className="text-center py-6 space-y-3">
+                <span className="material-symbols-outlined text-4xl text-outline mx-auto block">luggage</span>
+                <p className="text-sm font-semibold text-on-surface">No Active Expeditions Found</p>
+                <p className="text-xs text-on-surface-variant">
+                  Generate a blueprint in the AI Planner first to anchor waypoints.
+                </p>
+                <Link
+                  href="/planner"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-white text-xs font-semibold hover:bg-secondary-dark transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                  <span>Create Expedition</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5">
+                    Target Expedition
+                  </label>
+                  <select
+                    value={selectedTripId}
+                    onChange={(e) => {
+                      setSelectedTripId(e.target.value);
+                      setSelectedDayIndex(1);
+                    }}
+                    className="w-full bg-surface-container text-on-surface text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-outline-variant/60 focus:outline-none focus:border-secondary"
+                  >
+                    {trips.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.duration_days} Days)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5">
+                    Itinerary Day / Stage
+                  </label>
+                  {(() => {
+                    const activeTrip = trips.find((t) => t.id === selectedTripId);
+                    const daysCount = activeTrip?.duration_days || 3;
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from({ length: daysCount }, (_, i) => i + 1).map((day) => (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => setSelectedDayIndex(day)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              selectedDayIndex === day
+                                ? "bg-secondary text-white shadow-sm"
+                                : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                            }`}
+                          >
+                            Day {day}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAddToTripModalPlace(null)}
+                    className="px-4 py-2 rounded-xl bg-surface-container text-on-surface-variant hover:text-on-surface text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={addingStop || !selectedTripId}
+                    onClick={handleConfirmAddToTrip}
+                    className="px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold transition-all shadow-sm disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {addingStop ? (
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-sm">add_location_alt</span>
+                    )}
+                    <span>{addingStop ? "Attaching..." : "Confirm Attachment"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
