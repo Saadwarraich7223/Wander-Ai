@@ -244,7 +244,7 @@ export default function TripsPage() {
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold transition-all shadow-sm cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-base">add_circle</span>
-                    <span>+ Plan New Itinerary</span>
+                    <span> Plan New Itinerary</span>
                   </Link>
                 </div>
               </div>
@@ -478,45 +478,47 @@ export default function TripsPage() {
 
                           {/* Title */}
                           <div>
-                            <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-on-surface tracking-tight">
+                            <h2 className="font-display font-extrabold text-xl sm:text-2xl lg:text-3xl text-on-surface tracking-tight">
                               {activeTrip.title}
                             </h2>
                             <p className="text-xs sm:text-sm text-on-surface-variant mt-1.5 flex items-center gap-2">
                               <span className="material-symbols-outlined text-base text-secondary">alt_route</span>
-                              <span>
+                              <span className="line-clamp-1">
                                 {activeFirstUnvisited
                                   ? `Current Target: ${activeFirstUnvisited.item.place.name} (Day ${activeFirstUnvisited.dayNum}) → ${activeDestLoc.name} Route`
                                   : isAllStopsVisited
-                                  ? `All Waypoints Explored · ${activeDestLoc.name} Corridor Completed`
-                                  : `${activeDestLoc.name} · ${activeDestLoc.province} Corridor`}
+                                    ? `All Waypoints Explored · ${activeDestLoc.name} Corridor Completed`
+                                    : `${activeDestLoc.name} · ${activeDestLoc.province} Corridor`}
                               </span>
                             </p>
                           </div>
 
                           {/* Telemetry Box */}
-                          <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/40 space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 font-display text-sm font-bold text-on-surface">
+                          <div className="p-3.5 sm:p-4 rounded-xl bg-surface-container-low border border-outline-variant/40 flex flex-col gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-outline-variant/30">
+                              <div className="flex items-center gap-2 font-display text-xs sm:text-sm font-bold text-on-surface">
                                 <span className="material-symbols-outlined text-base text-secondary">my_location</span>
                                 <span>{activeDestLoc.name} · {activeDestLoc.province} Sector</span>
-                                <span className="text-on-surface-variant font-normal">· Live Status</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-xs">
-                                <span className="inline-flex items-center gap-1 text-on-surface-variant">
-                                  <span className="material-symbols-outlined text-sm text-amber-500">sunny</span>
-                                  {activeClimate?.tempHighC ?? 24}°C {activeClimate?.condition ?? "Clear Sky"}
+                                <span className="px-1.5 py-0.5 rounded bg-secondary/10 text-secondary text-[10px] font-mono font-bold">
+                                  Live Status
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-secondary font-semibold">
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+                                <span className="inline-flex items-center gap-1 text-on-surface-variant text-[11px] sm:text-xs">
+                                  <span className="material-symbols-outlined text-sm text-amber-500">sunny</span>
+                                  <span>{activeClimate?.tempHighC ?? 24}°C {activeClimate?.condition ?? "Clear Sky"}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-secondary font-bold text-[11px] sm:text-xs">
                                   <span className="material-symbols-outlined text-sm">check_circle</span>
-                                  Corridor: {activeRouteMetrics?.roadPassabilityPercent ?? 98}% PASSABLE
+                                  <span>Corridor: {activeRouteMetrics?.roadPassabilityPercent ?? 98}% Passable</span>
                                 </span>
                               </div>
                             </div>
 
                             {/* Dynamic Milestone Card */}
                             {isAllStopsVisited ? (
-                              <div className="flex items-center justify-between gap-4 pt-2 border-t border-outline-variant/30">
-                                <div className="flex items-center gap-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
+                                <div className="flex items-center gap-2.5 sm:gap-3">
                                   <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
                                     <span className="material-symbols-outlined text-sm">check</span>
                                   </div>
@@ -529,29 +531,29 @@ export default function TripsPage() {
                                     </div>
                                   </div>
                                 </div>
-                                <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-800 font-mono text-[10px] font-semibold">
+                                <span className="self-start sm:self-center px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-800 font-mono text-[10px] font-semibold shrink-0">
                                   Validated
                                 </span>
                               </div>
                             ) : featuredMilestone ? (
-                              <div className="flex items-center justify-between gap-4 pt-2 border-t border-outline-variant/30">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
+                                <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                                  <div className="w-7 h-7 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 sm:mt-0">
                                     WP{featuredMilestone.globalIndex}
                                   </div>
-                                  <div>
-                                    <div className="font-display font-semibold text-xs text-on-surface flex items-center gap-2">
-                                      <span>{featuredMilestone.item.place.name}</span>
-                                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-normal">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-display font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 flex-wrap">
+                                      <span className="truncate">{featuredMilestone.item.place.name}</span>
+                                      <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium shrink-0">
                                         Day {featuredMilestone.dayNum} · Spot #{featuredMilestone.indexInDay}
                                       </span>
                                     </div>
-                                    <div className="text-[11px] text-on-surface-variant">
-                                      Visit Duration: {featuredMilestone.item.visit_duration_minutes} mins · {activeFirstUnvisited?.item.id === featuredMilestone.item.id ? "Next Objective" : "Scheduled"}
+                                    <div className="text-[10px] sm:text-xs text-on-surface-variant mt-0.5">
+                                      Visit: {featuredMilestone.item.visit_duration_minutes} min · {activeFirstUnvisited?.item.id === featuredMilestone.item.id ? "Next Objective" : "Scheduled"}
                                     </div>
                                   </div>
                                 </div>
-                                <span className="px-2.5 py-1 rounded bg-surface-container font-mono text-[10px] text-on-surface font-semibold">
+                                <span className="self-start sm:self-center px-2.5 py-1 rounded-md bg-secondary/10 text-secondary font-mono text-[10px] font-bold shrink-0">
                                   {activeFirstUnvisited?.item.id === featuredMilestone.item.id ? "Active Objective" : "Validated"}
                                 </span>
                               </div>

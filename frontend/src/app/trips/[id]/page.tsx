@@ -6,6 +6,7 @@ import Link from "next/link";
 import { tripsApi, aiApi, placesApi, getErrorMessage } from "@/lib/api";
 import { Trip, ItineraryDay, ItineraryItem, PlaceSummary, TripExpense } from "@/types";
 import Navbar from "@/components/Navbar";
+import ExportDossierModal from "@/components/ExportDossierModal";
 import {
   findPakistanLocation,
   calculateRouteMetrics,
@@ -49,6 +50,7 @@ export default function TripDetailPage() {
 
   // Expense Logger states
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [expenseCategory, setExpenseCategory] = useState<string>("Dining");
   const [expenseAmount, setExpenseAmount] = useState<number | "">("");
   const [expenseNotes, setExpenseNotes] = useState<string>("");
@@ -732,10 +734,10 @@ export default function TripDetailPage() {
       <div className="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col">
         <Navbar />
 
-        <main className="w-full pt-24 bg-background">
-          <div className="relative w-full max-w-[1440px] mx-auto px-unit-8 pb-unit-20 space-y-8">
+        <main className="w-full pt-20 sm:pt-24 bg-background">
+          <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-20 space-y-6 sm:space-y-8">
             {/* Breadcrumb skeleton */}
-            <div className="flex items-center justify-between pt-unit-8 pb-unit-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 sm:pt-6 pb-4">
               <div className="flex items-center gap-2">
                 <div className="w-16 h-4 rounded bg-surface-container animate-pulse" />
                 <div className="w-3 h-3 rounded bg-surface-container animate-pulse" />
@@ -762,10 +764,10 @@ export default function TripDetailPage() {
             </div>
 
             {/* Itinerary Timeline Days Skeleton */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                 {[1, 2, 3].map((day) => (
-                  <div key={day} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6 space-y-4 shadow-xs animate-pulse">
+                  <div key={day} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-4 sm:p-6 space-y-4 shadow-xs animate-pulse">
                     <div className="flex items-center justify-between">
                       <div className="w-32 h-6 rounded-lg bg-surface-container" />
                       <div className="w-24 h-4 rounded bg-surface-container" />
@@ -779,8 +781,8 @@ export default function TripDetailPage() {
               </div>
 
               {/* Sidebar Summary Skeleton */}
-              <div className="space-y-6">
-                <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-6 space-y-5 shadow-xs animate-pulse">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant/60 p-4 sm:p-6 space-y-5 shadow-xs animate-pulse">
                   <div className="w-36 h-5 rounded bg-surface-container" />
                   <div className="space-y-3">
                     <div className="w-full h-4 rounded bg-surface-container" />
@@ -799,8 +801,8 @@ export default function TripDetailPage() {
 
   if (error || !trip) {
     return (
-      <div className="min-h-screen bg-background text-on-surface p-unit-6 flex flex-col items-center justify-center gap-unit-4">
-        <div className="p-unit-4 rounded-xl bg-error/10 border border-error/20 text-error text-body-sm max-w-md text-center">
+      <div className="min-h-screen bg-background text-on-surface p-4 sm:p-6 flex flex-col items-center justify-center gap-4">
+        <div className="p-4 rounded-xl bg-error/10 border border-error/20 text-error text-body-sm max-w-md text-center">
           {error || "Trip not found"}
         </div>
         <Link href="/trips" className="text-body-sm text-secondary hover:underline font-semibold">
@@ -817,34 +819,31 @@ export default function TripDetailPage() {
       <Navbar />
 
       {/* ==================== MAIN CANVAS ==================== */}
-      <main className="w-full pt-24 bg-background">
+      <main className="w-full pt-20 sm:pt-24 bg-background">
         <div className="flex flex-col w-full">
 
           {/* Ambient Glow & Container */}
-          <div className="relative w-full max-w-[1440px] mx-auto px-unit-8 pb-unit-20 overflow-hidden">
+          <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-20 overflow-hidden">
             <div className="absolute -top-40 right-10 w-96 h-96 rounded-full bg-secondary/5 blur-3xl pointer-events-none -z-10" />
             <div className="absolute top-96 -left-32 w-80 h-80 rounded-full bg-tertiary-fixed-dim/10 blur-3xl pointer-events-none -z-10" />
 
             {/* Breadcrumb & Monospace Tracker */}
-            <div className="flex items-center justify-between pt-unit-8 pb-unit-4">
-              <div className="flex items-center gap-unit-2 font-body-sm text-body-sm text-on-surface-variant">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-4 sm:pt-6 pb-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-on-surface-variant">
                 <Link className="hover:text-on-surface transition-colors" href="/trips">My Trips</Link>
                 <span>/</span>
-                <span className="text-on-surface font-semibold">{trip.title} Synthesis #{trip.id.substring(0, 4)}</span>
+                <span className="text-on-surface font-semibold truncate max-w-[240px] sm:max-w-md">{trip.title}</span>
               </div>
-              <div className="flex items-center gap-unit-3">
-                <span className="inline-flex items-center gap-1.5 px-unit-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" /> Live Route Validated
-                </span>
-                <span className="font-body-sm text-body-sm text-outline font-mono">{destLoc.name} · {destLoc.province} Sector</span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs text-outline font-mono">{destLoc.name} · {destLoc.province} Sector</span>
               </div>
             </div>
 
             {/* Trip Summary Header Banner */}
-            <div className="bg-surface-container-lowest rounded-xl p-unit-8 shadow-sm relative overflow-hidden mb-unit-8 border border-outline-variant/50">
-              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-unit-6">
-                <div className="flex flex-col gap-unit-3 max-w-2xl">
-                  <div className="flex flex-wrap items-center gap-unit-2">
+            <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm relative overflow-hidden mb-6 sm:mb-8 border border-outline-variant/50">
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+                <div className="flex flex-col gap-3 max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-xs font-semibold">
                       {trip.duration_days} Days
                     </span>
@@ -872,20 +871,20 @@ export default function TripDetailPage() {
                       {destInterests.categoryBadge}
                     </span>
                   </div>
-                  <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-on-surface tracking-tight leading-tight mt-1">
+                  <h1 className="font-display text-xl sm:text-2xl lg:text-4xl font-extrabold text-on-surface tracking-tight leading-tight mt-1 break-words">
                     {trip.title}
                   </h1>
-                  <p className="font-sans text-sm sm:text-base text-on-surface-variant leading-relaxed">
+                  <p className="font-sans text-xs sm:text-sm md:text-base text-on-surface-variant leading-relaxed">
                     {activeItinerary?.narrative || `A bespoke algorithmic route along the ${routeMetrics.corridorName} balancing ${destLoc.name} landmarks, regional heritage, and authentic culinary stops.`}
                   </p>
                 </div>
 
-                {/* Action Bar */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Action Bar (Responsive Grid on Mobile) */}
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
                   {trip.status === "planning" || !trip.status ? (
                     <button
                       onClick={() => handleStatusChange("active")}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold shadow-sm transition-colors cursor-pointer border border-transparent"
+                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold shadow-sm transition-colors cursor-pointer border border-transparent col-span-2 sm:col-span-1"
                       type="button"
                     >
                       <span className="material-symbols-outlined text-base">play_arrow</span>
@@ -895,7 +894,7 @@ export default function TripDetailPage() {
                     <>
                       <button
                         onClick={() => setIsLiveMode(!isLiveMode)}
-                        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer border ${
+                        className={`inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer border ${
                           isLiveMode
                             ? "bg-emerald-600 text-white hover:bg-emerald-700 border-transparent"
                             : "bg-surface-container-low text-emerald-800 hover:bg-surface-container border-outline-variant/60"
@@ -903,21 +902,21 @@ export default function TripDetailPage() {
                         type="button"
                       >
                         <span className="material-symbols-outlined text-base">navigation</span>
-                        <span>{isLiveMode ? "Live HUD Active" : "Live HUD"}</span>
+                        <span>{isLiveMode ? "HUD Active" : "Live HUD"}</span>
                       </button>
                       <button
                         onClick={() => handleStatusChange("completed")}
-                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                        className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                         type="button"
                       >
                         <span className="material-symbols-outlined text-base text-secondary">check_circle</span>
-                        <span>Mark Completed</span>
+                        <span>Completed</span>
                       </button>
                     </>
                   ) : (
                     <button
                       onClick={() => handleStatusChange("planning")}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                       type="button"
                     >
                       <span className="material-symbols-outlined text-base">replay</span>
@@ -927,7 +926,7 @@ export default function TripDetailPage() {
 
                   <button
                     onClick={() => setShowExpenseModal(true)}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base text-secondary">payments</span>
@@ -936,26 +935,26 @@ export default function TripDetailPage() {
 
                   <button
                     onClick={() => setAiDrawerOpen(true)}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base text-secondary">auto_awesome</span>
-                    <span>Edit with AI</span>
+                    <span>AI Co-Pilot</span>
                   </button>
 
                   <button
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    onClick={() => setShowExportModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
-                    <span className="material-symbols-outlined text-base">picture_as_pdf</span>
-                    <span>PDF</span>
+                    <span className="material-symbols-outlined text-base text-secondary">file_download</span>
+                    <span>Export</span>
                   </button>
 
                   {activeItinerary && (
                     <Link
                       href={`/explore?trip_id=${trip.id}`}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     >
                       <span className="material-symbols-outlined text-base text-secondary">map</span>
                       <span>Smart Map</span>
@@ -964,7 +963,7 @@ export default function TripDetailPage() {
 
                   <button
                     onClick={() => setShowReoptimize(true)}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base text-secondary">refresh</span>
@@ -973,7 +972,7 @@ export default function TripDetailPage() {
 
                   <button
                     onClick={handleDeleteTrip}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-container-low text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base">delete</span>
@@ -985,10 +984,10 @@ export default function TripDetailPage() {
 
             {/* Live Expedition Companion HUD (When in Live Mode or Active Status) */}
             {(isLiveMode || trip.status === "active") && (
-              <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-luxury border-2 border-emerald-500/40 mb-6 relative overflow-hidden bg-gradient-to-br from-emerald-500/5 via-surface-container-lowest to-secondary/5">
+              <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-luxury border-2 border-emerald-500/40 mb-6 relative overflow-hidden bg-gradient-to-br from-emerald-500/5 via-surface-container-lowest to-secondary/5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant/50">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                    <div className="hidden sm:flex w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 items-center justify-center font-bold shrink-0">
                       <span className="material-symbols-outlined text-2xl animate-pulse">navigation</span>
                     </div>
                     <div>
@@ -1176,30 +1175,25 @@ export default function TripDetailPage() {
             )}
 
             {/* Departure Origin Vector Card */}
-            <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm mb-6 border border-secondary/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-secondary/5 via-surface-container-lowest to-transparent">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 flex items-center justify-center font-bold shrink-0">
-                  <span className="material-symbols-outlined text-2xl">my_location</span>
+            <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm mb-6 border border-secondary/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-secondary/5 via-surface-container-lowest to-transparent">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md">
+                    Trip Departure Origin Vector
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md">
-                      Trip Departure Origin Vector
-                    </span>
-                  </div>
-                  <p className="text-sm sm:text-base font-extrabold text-on-surface mt-0.5">
-                    Route Starts From: <span className="text-secondary font-black">{originLoc.name}</span> → <span className="text-on-surface">{destLoc.name}</span> ({days.length} Daily Clusters)
-                  </p>
-                  <p className="text-xs text-on-surface-variant">
-                    Spatial route vector calculated via {routeMetrics.corridorName} ({routeMetrics.drivingDistanceKm} km · ~{routeMetrics.drivingTimeFormatted}).
-                  </p>
-                </div>
+                <p className="text-sm sm:text-base font-extrabold text-on-surface mt-0.5">
+                  Route Starts From: <span className="text-secondary font-black">{originLoc.name}</span> → <span className="text-on-surface">{destLoc.name}</span> ({days.length} Daily Clusters)
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  Spatial route vector calculated via {routeMetrics.corridorName} ({routeMetrics.drivingDistanceKm} km · ~{routeMetrics.drivingTimeFormatted}).
+                </p>
               </div>
 
               {activeItinerary && (
                 <Link
                   href={`/explore?trip_id=${trip.id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer w-full sm:w-auto justify-center"
                 >
                   <span className="material-symbols-outlined text-base">map</span>
                   <span>View Departure Map</span>
@@ -1208,58 +1202,58 @@ export default function TripDetailPage() {
             </div>
 
             {/* Elevation & Environmental Bar Indicator */}
-            <div className="bg-surface-container-lowest rounded-xl p-unit-4 shadow-sm mb-unit-8 flex flex-col md:flex-row items-center justify-between gap-unit-4 border border-outline-variant/50">
-              <div className="flex items-center gap-unit-6 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                <div className="flex items-center gap-unit-3">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary">
-                    <span className="material-symbols-outlined text-base">landscape</span>
+            <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm mb-6 sm:mb-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border border-outline-variant/50">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 w-full lg:w-auto">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
+                    <span className="material-symbols-outlined text-lg">landscape</span>
                   </div>
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Elevation Gradient</div>
-                    <div className="font-display text-sm font-semibold text-on-surface">
+                    <div className="font-display text-xs sm:text-sm font-semibold text-on-surface">
                       {originLoc.elevation_m}m → {destLoc.elevation_m}m ({Math.abs(routeMetrics.elevationChangeMeters)}m Δ)
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-unit-3">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary">
-                    <span className="material-symbols-outlined text-base">schedule</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
+                    <span className="material-symbols-outlined text-lg">schedule</span>
                   </div>
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Pacing Index</div>
-                    <div className="font-display text-sm font-semibold text-on-surface capitalize">Optimal Dynamic ({trip.pace})</div>
+                    <div className="font-display text-xs sm:text-sm font-semibold text-on-surface capitalize">Optimal Dynamic ({trip.pace})</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-unit-3">
-                  <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary">
-                    <span className="material-symbols-outlined text-base">explore</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
+                    <span className="material-symbols-outlined text-lg">explore</span>
                   </div>
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Corridor Readiness</div>
-                    <div className="font-display text-sm font-semibold text-on-surface">
+                    <div className="font-display text-xs sm:text-sm font-semibold text-on-surface truncate">
                       {routeMetrics.corridorName.split("/")[0]?.trim() || "National Highway"} • {routeMetrics.roadPassabilityPercent}% Passable
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-unit-2 w-full md:w-auto justify-end">
-                <span className="text-xs text-on-surface-variant font-medium">Synched with {destLoc.province} Regional Meteorological Bureau</span>
-                <span className="w-2 h-2 rounded-full bg-secondary" />
+              <div className="flex items-center gap-2 w-full lg:w-auto justify-start lg:justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-outline-variant/40">
+                <span className="text-[11px] sm:text-xs text-on-surface-variant font-medium">Synched with {destLoc.province} Regional Meteorological Bureau</span>
+                <span className="w-2 h-2 rounded-full bg-secondary shrink-0" />
               </div>
             </div>
 
             {/* MAIN TWO-COLUMN SPLIT */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-unit-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
 
               {/* LEFT COLUMN: Interactive Day-by-Day Timeline (8 Columns) */}
-              <div className="lg:col-span-8 flex flex-col gap-unit-6">
+              <div className="lg:col-span-8 flex flex-col gap-4 sm:gap-6">
 
                 {days.length === 0 ? (
-                  <div className="p-unit-12 text-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant">
-                    <span className="material-symbols-outlined text-4xl text-outline mb-unit-2">route</span>
+                  <div className="p-8 sm:p-12 text-center bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant">
+                    <span className="material-symbols-outlined text-4xl text-outline mb-2">route</span>
                     <p className="text-sm text-on-surface-variant">No itinerary days available yet.</p>
                   </div>
                 ) : (
@@ -1276,7 +1270,7 @@ export default function TripDetailPage() {
                         {/* Day Header Bar */}
                         <div
                           onClick={() => toggleDayExpansion(day.day_number)}
-                          className="p-5 bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-unit-4 cursor-pointer hover:bg-surface-container-high/60 transition-colors"
+                          className="p-5 bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-surface-container-high/60 transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl ${isExpanded ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface'} flex flex-col items-center justify-center shrink-0`}>
@@ -1305,7 +1299,7 @@ export default function TripDetailPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-unit-3 self-start sm:self-auto">
+                          <div className="flex items-center gap-3 self-start sm:self-auto">
                             <span className="px-3 py-1 rounded-full bg-surface-container-high text-xs font-semibold text-on-surface">
                               {visitedInDay > 0 ? `${visitedInDay}/${dayStops} visited` : `${dayStops} stop${dayStops !== 1 ? 's' : ''}`}
                               {dayDistance > 0 ? ` • ${dayDistance.toFixed(1)} km` : ''}
@@ -1448,10 +1442,10 @@ export default function TripDetailPage() {
                               </div>
                             ) : (
                               <>
-                                {/* Continuous vertical timeline background runner */}
-                                <div className="absolute left-[2.45rem] top-8 bottom-16 w-0.5 bg-surface-container-highest -z-0" />
+                                {/* Continuous vertical timeline background runner (Hidden on mobile) */}
+                                <div className="hidden sm:block absolute left-[2.45rem] top-8 bottom-16 w-0.5 bg-surface-container-highest -z-0" />
 
-                                <div className="flex flex-col gap-5">
+                                <div className="flex flex-col gap-4 sm:gap-5">
                                   {day.items.map((item, idx) => {
                                     const iconName = getItemIcon(item);
                                     const isLast = idx === day.items.length - 1;
@@ -1463,8 +1457,8 @@ export default function TripDetailPage() {
                                       <div key={item.id} className="flex flex-col">
 
                                         {/* Item Card */}
-                                        <div className="relative flex items-start gap-4 group">
-                                          <div className={`w-8 h-8 rounded-full border shadow-sm flex items-center justify-center z-10 shrink-0 transition-colors ${
+                                        <div className="relative flex items-start gap-0 sm:gap-4 group">
+                                          <div className={`hidden sm:flex w-8 h-8 rounded-full border shadow-sm items-center justify-center z-10 shrink-0 transition-colors ${
                                             isVisited
                                               ? "bg-emerald-500 border-emerald-600 text-white"
                                               : "bg-surface-container-lowest border-secondary/30 text-secondary"
@@ -1474,7 +1468,7 @@ export default function TripDetailPage() {
                                             </span>
                                           </div>
 
-                                          <div className={`flex-1 border rounded-xl p-4 transition-all shadow-xs ${
+                                          <div className={`w-full flex-1 border rounded-xl p-3.5 sm:p-4 transition-all shadow-xs ${
                                             isVisited
                                               ? "bg-surface-container-lowest/80 border-emerald-500/30 opacity-90"
                                               : "bg-surface-container-low border-outline-variant/50 hover:bg-surface-container-high/70"
@@ -1627,7 +1621,7 @@ export default function TripDetailPage() {
 
                                         {/* Contextual Afternoon Swap Banner (on Day 1 after 2nd item) */}
                                         {day.day_number === 1 && idx === 2 && (
-                                          <div className="my-3 ml-12 p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                          <div className="my-3 ml-0 sm:ml-12 p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                             <div className="flex items-center gap-3">
                                               <div className="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
                                                 <span className="material-symbols-outlined text-sm">auto_awesome</span>
@@ -1656,8 +1650,8 @@ export default function TripDetailPage() {
 
                                         {/* Transit Connector between items */}
                                         {!isLast && (
-                                          <div className="relative flex items-center gap-4 pl-7 py-1.5">
-                                            <div className="w-4 flex justify-center">
+                                          <div className="relative flex items-center gap-2 sm:gap-4 pl-0 sm:pl-7 py-1.5">
+                                            <div className="hidden sm:flex w-4 justify-center">
                                               <span className="material-symbols-outlined text-xs text-outline">more_vert</span>
                                             </div>
                                             <div className="flex items-center gap-2 font-mono text-[11px] text-outline">
@@ -1723,14 +1717,14 @@ export default function TripDetailPage() {
 
                                 {/* Day Completion / Advance Banner */}
                                 {day.items.length > 0 && (
-                                  <div className="mt-4 pt-3.5 border-t border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/30">
+                                  <div className="mt-4 pt-3.5 border-t border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-container-low/70 rounded-xl p-3.5 sm:p-4 border border-outline-variant/40">
                                     {isDayAllVisited ? (
                                       <>
                                         <div className="flex items-center gap-2.5">
-                                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-700 flex items-center justify-center shrink-0">
-                                            <span className="material-symbols-outlined !text-[15px]">check</span>
+                                          <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-800 flex items-center justify-center shrink-0">
+                                            <span className="material-symbols-outlined text-base">check</span>
                                           </div>
-                                          <span className="text-xs font-semibold text-emerald-800">
+                                          <span className="text-xs sm:text-sm font-bold text-emerald-800">
                                             Day {day.day_number} Complete · All {day.items.length} {day.items.length === 1 ? "stop" : "stops"} visited
                                           </span>
                                         </div>
@@ -1740,32 +1734,32 @@ export default function TripDetailPage() {
                                               const nextDayNum = day.day_number + 1;
                                               setExpandedDays((prev) => new Set([...prev, nextDayNum]));
                                             }}
-                                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition-colors shadow-2xs cursor-pointer self-start sm:self-auto"
+                                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-bold transition-all shadow-sm cursor-pointer w-full sm:w-auto"
                                             type="button"
                                           >
                                             <span>Proceed to Day {day.day_number + 1}</span>
-                                            <span className="material-symbols-outlined text-sm text-secondary">arrow_forward</span>
+                                            <span className="material-symbols-outlined text-base">arrow_forward</span>
                                           </button>
                                         ) : (
-                                          <span className="text-[11px] font-mono text-outline">
+                                          <span className="text-[11px] font-mono text-outline font-semibold">
                                             Final day of expedition
                                           </span>
                                         )}
                                       </>
                                     ) : (
                                       <>
-                                        <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-                                          <span className="material-symbols-outlined text-sm text-secondary">task_alt</span>
-                                          <span>
+                                        <div className="flex items-center gap-2 text-xs sm:text-sm text-on-surface-variant">
+                                          <span className="material-symbols-outlined text-base text-secondary">task_alt</span>
+                                          <span className="font-semibold text-on-surface">
                                             {visitedInDay} of {day.items.length} {day.items.length === 1 ? "stop" : "stops"} checked in
                                           </span>
                                         </div>
                                         <button
                                           onClick={() => handleCompleteDayAndAdvance(day.day_number, day.items)}
-                                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition-colors shadow-2xs cursor-pointer self-start sm:self-auto"
+                                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer w-full sm:w-auto"
                                           type="button"
                                         >
-                                          <span className="material-symbols-outlined text-sm text-secondary">done_all</span>
+                                          <span className="material-symbols-outlined text-base">done_all</span>
                                           <span>Complete Day {day.day_number} &amp; Advance</span>
                                         </button>
                                       </>
@@ -1949,10 +1943,24 @@ export default function TripDetailPage() {
 
                 {/* MODULE 2: WEATHER & GEAR MATRIX */}
                 <div className="bg-surface-container-lowest rounded-xl p-5 shadow-sm border border-outline-variant/60 flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-display font-bold text-base text-on-surface">Weather &amp; Gear Matrix</h2>
-                    <span className="text-xs text-outline font-mono">{destLoc.name} ({climateMetrics.seasonTag})</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-outline-variant/30">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-secondary text-lg">cloud_sync</span>
+                      <h2 className="font-display font-bold text-sm sm:text-base text-on-surface">Weather &amp; Gear Matrix</h2>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-mono text-[10px] font-bold">
+                        {climateMetrics.seasonTag}
+                      </span>
+                      <span className="text-xs text-outline font-mono">
+                        {climateMetrics.tempHighC}° / {climateMetrics.tempLowC}°C
+                      </span>
+                    </div>
                   </div>
+
+                  <p className="text-xs text-on-surface-variant font-medium">
+                    {destLoc.name} · {climateMetrics.condition}
+                  </p>
 
                   {/* 4-Day Mini Forecast Strip */}
                   <div className="grid grid-cols-4 gap-1.5 bg-surface-container-low rounded-lg p-2.5 text-center border border-outline-variant/30">
@@ -2107,9 +2115,9 @@ export default function TripDetailPage() {
         className={`fixed inset-y-0 right-0 w-full max-w-md z-50 bg-surface-container-lowest shadow-2xl transform transition-transform duration-300 flex flex-col ${aiDrawerOpen ? "translate-x-0" : "translate-x-full"
           }`}
       >
-        <div className="p-unit-6 bg-surface-container-low flex items-center justify-between">
-          <div className="flex items-center gap-unit-3">
-            <span className="material-symbols-outlined text-base text-secondary">auto_awesome</span>
+        <div className="p-4 sm:p-6 bg-surface-container-low flex items-center justify-between border-b border-outline-variant/40">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-lg text-secondary">auto_awesome</span>
             <h3 className="font-title-lg text-title-lg text-on-surface font-semibold">AI Itinerary Co-Pilot</h3>
           </div>
           <button
@@ -2121,26 +2129,26 @@ export default function TripDetailPage() {
           </button>
         </div>
 
-        <div className="p-unit-6 flex-1 overflow-y-auto flex flex-col gap-unit-4 font-body-sm text-body-sm">
-          <div className="p-unit-4 rounded-xl bg-surface-container-low text-on-surface">
-            <p className="mb-unit-2 font-semibold text-secondary">Algorithm Ready</p>
-            <p className="text-on-surface-variant">Type commands like: "Make Day 3 more budget-friendly", "Add more local food stops in Gulmit", or "Shift duration to 6 days".</p>
+        <div className="p-4 sm:p-6 flex-1 overflow-y-auto flex flex-col gap-4 text-xs sm:text-sm">
+          <div className="p-3.5 sm:p-4 rounded-xl bg-surface-container-low text-on-surface border border-outline-variant/40">
+            <p className="mb-1 font-semibold text-secondary">Algorithm Ready</p>
+            <p className="text-on-surface-variant text-xs leading-relaxed">Type commands like: "Make Day 3 more budget-friendly", "Add more local food stops in Gulmit", or "Shift duration to 6 days".</p>
           </div>
 
-          <div className="flex flex-col gap-unit-3">
+          <div className="flex flex-col gap-3">
             {drawerChat.map((msg, index) => (
               <div
                 key={index}
-                className={`p-unit-3 rounded-xl max-w-[85%] text-body-sm ${msg.role === "user"
-                  ? "bg-surface-container text-on-surface-variant self-end"
-                  : "bg-surface-container-low text-on-surface self-start shadow-sm"
+                className={`p-3 rounded-xl max-w-[85%] text-xs sm:text-sm leading-relaxed ${msg.role === "user"
+                  ? "bg-surface-container text-on-surface self-end border border-outline-variant/40"
+                  : "bg-surface-container-low text-on-surface-variant self-start border border-outline-variant/30 shadow-xs"
                   }`}
               >
                 {msg.text}
               </div>
             ))}
             {drawerLoading && (
-              <div className="p-unit-3 rounded-xl bg-surface-container-low text-on-surface-variant self-start shadow-sm animate-pulse">
+              <div className="p-3 rounded-xl bg-surface-container-low text-on-surface-variant self-start shadow-xs animate-pulse text-xs">
                 Optimizing itinerary vector matrix...
               </div>
             )}
@@ -2152,18 +2160,18 @@ export default function TripDetailPage() {
             e.preventDefault();
             handleDrawerSend();
           }}
-          className="p-unit-4 bg-surface-container-low flex items-center gap-unit-2"
+          className="p-3.5 sm:p-4 bg-surface-container-low flex items-center gap-2 border-t border-outline-variant/40"
         >
           <input
             value={drawerMessage}
             onChange={(e) => setDrawerMessage(e.target.value)}
-            className="flex-1 px-unit-4 py-2 rounded-lg bg-surface-container-lowest text-on-surface placeholder-outline font-body-sm text-body-sm focus:outline-none"
+            className="flex-1 px-3.5 py-2.5 rounded-xl bg-surface-container-lowest text-on-surface placeholder-outline text-xs focus:outline-none focus:ring-1 focus:ring-secondary border border-outline-variant/40"
             placeholder="Instruct WanderAI..."
             type="text"
           />
           <button
             disabled={drawerLoading}
-            className="p-2.5 rounded-lg bg-secondary text-on-secondary hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            className="p-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark transition-colors cursor-pointer disabled:opacity-50 shrink-0"
             type="submit"
           >
             <span className="material-symbols-outlined text-base">send</span>
@@ -2676,13 +2684,18 @@ export default function TripDetailPage() {
         </div>
       )}
 
+      {/* Expedition Dossier & Multi-Format Export Modal */}
+      {showExportModal && trip && (
+        <ExportDossierModal trip={trip} onClose={() => setShowExportModal(false)} />
+      )}
+
 
       {/* ==================== FOOTER ==================== */}
-      <footer className="w-full bg-surface-container-low pt-unit-16 pb-unit-12 border-t border-outline-variant/60">
-        <div className="max-w-[1440px] mx-auto px-unit-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-unit-10 pb-unit-12">
-            <div className="lg:col-span-4 flex flex-col items-start gap-unit-4">
-              <div className="flex items-center gap-unit-3">
+      <footer className="w-full bg-surface-container-low pt-12 sm:pt-16 pb-8 sm:pb-12 border-t border-outline-variant/60">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 pb-8 sm:pb-12">
+            <div className="lg:col-span-4 flex flex-col items-start gap-4">
+              <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center">
                   <span className="material-symbols-outlined text-secondary text-lg">travel_explore</span>
                 </div>
@@ -2691,33 +2704,33 @@ export default function TripDetailPage() {
               <p className="font-body-lg text-body-lg text-on-surface-variant max-w-sm">Explore more. Plan smarter. Travel better.</p>
               <p className="font-body-sm text-body-sm text-on-surface-variant max-w-sm">High-touch bespoke travel curation augmented by state-of-the-art computational intelligence.</p>
             </div>
-            <div className="lg:col-span-2 flex flex-col gap-unit-3">
+            <div className="lg:col-span-2 flex flex-col gap-3">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface">Explore</span>
-              <div className="flex flex-col gap-unit-2">
+              <div className="flex flex-col gap-2">
                 <Link className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="/explore">Curated Itineraries</Link>
                 <Link className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="/places">Regional Guides</Link>
                 <Link className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="/explore#map">Interactive Waypoints</Link>
               </div>
             </div>
-            <div className="lg:col-span-2 flex flex-col gap-unit-3">
+            <div className="lg:col-span-2 flex flex-col gap-3">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface">AI Tools</span>
-              <div className="flex flex-col gap-unit-2">
+              <div className="flex flex-col gap-2">
                 <Link className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="/planner">Smart Itinerary Synthesizer</Link>
                 <Link className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors" href="/assistant">Concierge Companion</Link>
               </div>
             </div>
-            <div className="lg:col-span-4 flex flex-col gap-unit-4">
+            <div className="lg:col-span-4 flex flex-col gap-4">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface">AI Dispatch &amp; Updates</span>
               <p className="font-body-sm text-body-sm text-on-surface-variant">Receive exclusive seasonal expedition releases and algorithmic travel insights.</p>
-              <div className="flex items-center gap-unit-2">
-                <input className="flex-1 px-unit-4 py-unit-2 rounded-lg bg-surface-container-lowest text-on-surface placeholder-outline font-body-sm text-body-sm focus:outline-none shadow-[0_1px_4px_rgba(0,0,0,0.02)]" placeholder="Enter your email" type="email" />
-                <button className="px-unit-4 py-unit-2 rounded-lg bg-secondary text-on-secondary hover:bg-secondary-dark transition-colors font-title-md text-title-md cursor-pointer" type="button">Join</button>
+              <div className="flex items-center gap-2">
+                <input className="flex-1 px-4 py-2 rounded-lg bg-surface-container-lowest text-on-surface placeholder-outline font-body-sm text-body-sm focus:outline-none shadow-[0_1px_4px_rgba(0,0,0,0.02)]" placeholder="Enter your email" type="email" />
+                <button className="px-4 py-2 rounded-lg bg-secondary text-on-secondary hover:bg-secondary-dark transition-colors font-title-md text-title-md cursor-pointer" type="button">Join</button>
               </div>
             </div>
           </div>
-          <div className="pt-unit-8 flex flex-col md:flex-row items-center justify-between gap-unit-4 border-t border-outline-variant/40">
+          <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-outline-variant/40">
             <p className="font-body-sm text-body-sm text-on-surface-variant">© 2025 WanderAI Intelligence Inc. All rights reserved.</p>
-            <div className="flex items-center gap-unit-6">
+            <div className="flex items-center gap-6">
               <a className="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" href="#">Privacy Policy</a>
               <a className="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" href="#">Terms of Service</a>
             </div>

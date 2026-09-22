@@ -362,11 +362,46 @@ function SmartMapContent() {
   const [guidedWalkActive, setGuidedWalkActive] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
 
+  // Mobile Card Auto-Slideout & Route HUD State
+  const [isCardCollapsed, setIsCardCollapsed] = useState(false);
+  const [isRouteHudCollapsed, setIsRouteHudCollapsed] = useState(false);
+  const autoCollapseTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const cancelAutoCollapse = () => {
+    if (autoCollapseTimerRef.current) {
+      clearTimeout(autoCollapseTimerRef.current);
+      autoCollapseTimerRef.current = null;
+    }
+  };
+
+  const startAutoCollapse = (delayMs = 5000) => {
+    cancelAutoCollapse();
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      autoCollapseTimerRef.current = setTimeout(() => {
+        setIsCardCollapsed(true);
+      }, delayMs);
+    }
+  };
+
+  const selectPlaceWithTimer = (placeId: string) => {
+    setSelectedPlaceId(placeId);
+    setIsCardCollapsed(false);
+    startAutoCollapse(5000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (autoCollapseTimerRef.current) {
+        clearTimeout(autoCollapseTimerRef.current);
+      }
+    };
+  }, []);
+
   // Leaflet Map Refs
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const leafletMapRef = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
-  const polylineRef = useRef<any>(null);
+  const polylinesRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
 
   // AI & Trip Creation State
@@ -459,7 +494,7 @@ function SmartMapContent() {
             });
           });
           setRouteWaypoints(tripWaypointIds);
-          setSelectedPlaceId("origin_city_start");
+          selectPlaceWithTimer("origin_city_start");
         }
       } catch (e) {
         // Trip load failed — continue in normal mode
@@ -750,7 +785,7 @@ function SmartMapContent() {
 
         const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
         marker.on("click", () => {
-          setSelectedPlaceId(poi.id);
+          selectPlaceWithTimer(poi.id);
           map.panTo([lat, lng], { animate: true });
         });
         markersRef.current[poi.id] = marker;
@@ -762,7 +797,7 @@ function SmartMapContent() {
     };
   }, [filteredPois, selectedPlaceId, mapReady]);
 
-  // Route polyline — redraws only when the ordered waypoints change
+  // Route polylines — redraws sequential day-colored tracks or custom explore route
   useEffect(() => {
     if (!leafletMapRef.current || !mapReady) return;
     let disposed = false;
@@ -771,46 +806,93 @@ function SmartMapContent() {
       if (disposed || !leafletMapRef.current) return;
       const map = leafletMapRef.current;
 
-      if (polylineRef.current) {
-        polylineRef.current.remove();
-        polylineRef.current = null;
+      // Clean up previous polylines
+      if (polylinesRef.current.length > 0) {
+        polylinesRef.current.forEach((poly) => poly.remove());
+        polylinesRef.current = [];
       }
 
       const validPois = filteredPois.filter(
         (p) => typeof p.lat === "number" && typeof p.lng === "number" && !isNaN(p.lat!) && !isNaN(p.lng!)
       );
 
-      // Draw route line through waypoints (including origin starting vector)
-      const orderedWaypoints = routeWaypoints.length > 0 ? routeWaypoints : validPois.map((p) => p.id);
-      const routeLatLngs: [number, number][] = [];
+      const DAY_PALETTE = ["#059669", "#0284c7", "#7c3aed", "#d97706", "#db2777", "#0d9488", "#4f46e5"];
 
-      const originPoi = validPois.find((p) => p.id === "origin_city_start" || p.waypointNum === 0);
-      if (originPoi && typeof originPoi.lat === "number" && typeof originPoi.lng === "number") {
-        routeLatLngs.push([originPoi.lat, originPoi.lng]);
-      }
+      if (activeTripData?.active_itinerary?.days && activeTripData.active_itinerary.days.length > 0) {
+        // TRIP MODE: Render day-specific sequential polylines
+        const originPoi = validPois.find((p) => p.id === "origin_city_start" || p.waypointNum === 0);
+        let firstDayFirstStop: [number, number] | null = null;
 
-      orderedWaypoints.forEach((wpId) => {
-        if (wpId === "origin_city_start") return;
-        const poi = validPois.find((p) => p.id === wpId);
-        if (poi && typeof poi.lat === "number" && typeof poi.lng === "number") {
-          routeLatLngs.push([poi.lat, poi.lng]);
+        activeTripData.active_itinerary.days.forEach((day, dIdx) => {
+          const isCurrentDayActive = selectedTripDay === "all" || selectedTripDay === day.day_number;
+          const dayColor = DAY_PALETTE[dIdx % DAY_PALETTE.length];
+          const dayLatLngs: [number, number][] = [];
+
+          // Sort day items by item_order
+          const sortedItems = [...day.items].sort((a, b) => (a.item_order || 0) - (b.item_order || 0));
+
+          sortedItems.forEach((item) => {
+            const poi = validPois.find((p) => p.id === item.place.id);
+            if (poi && typeof poi.lat === "number" && typeof poi.lng === "number") {
+              dayLatLngs.push([poi.lat, poi.lng]);
+              if (!firstDayFirstStop && dIdx === 0) {
+                firstDayFirstStop = [poi.lat, poi.lng];
+              }
+            }
+          });
+
+          if (dayLatLngs.length > 1) {
+            const poly = L.polyline(dayLatLngs, {
+              color: dayColor,
+              weight: isCurrentDayActive ? 4 : 2,
+              opacity: isCurrentDayActive ? 0.95 : 0.25,
+              dashArray: isCurrentDayActive ? "6, 8" : "3, 6",
+            }).addTo(map);
+            poly.bindTooltip(`Day ${day.day_number} Route Track (${day.items.length} Stops)`, { sticky: true });
+            polylinesRef.current.push(poly);
+          }
+        });
+
+        // Origin departure vector to first stop
+        if (originPoi && firstDayFirstStop && typeof originPoi.lat === "number" && typeof originPoi.lng === "number") {
+          const originPoly = L.polyline([[originPoi.lat, originPoi.lng], firstDayFirstStop], {
+            color: "#2563eb",
+            weight: 3,
+            opacity: 0.8,
+            dashArray: "4, 6",
+          }).addTo(map);
+          originPoly.bindTooltip("Departure Corridor Vector", { sticky: true });
+          polylinesRef.current.push(originPoly);
         }
-      });
+      } else {
+        // EXPLORE MODE: Draw single ordered sequence
+        const orderedWaypoints = routeWaypoints.length > 0 ? routeWaypoints : validPois.map((p) => p.id);
+        const routeLatLngs: [number, number][] = [];
 
-      if (routeLatLngs.length > 1) {
-        polylineRef.current = L.polyline(routeLatLngs, {
-          color: "#186a57",
-          weight: 4,
-          opacity: 0.9,
-          dashArray: "6, 8",
-        }).addTo(map);
+        orderedWaypoints.forEach((wpId) => {
+          const poi = validPois.find((p) => p.id === wpId);
+          if (poi && typeof poi.lat === "number" && typeof poi.lng === "number") {
+            routeLatLngs.push([poi.lat, poi.lng]);
+          }
+        });
+
+        if (routeLatLngs.length > 1) {
+          const poly = L.polyline(routeLatLngs, {
+            color: "#186a57",
+            weight: 4,
+            opacity: 0.9,
+            dashArray: "6, 8",
+          }).addTo(map);
+          poly.bindTooltip("Curated Route Corridor", { sticky: true });
+          polylinesRef.current.push(poly);
+        }
       }
     });
 
     return () => {
       disposed = true;
     };
-  }, [filteredPois, routeWaypoints, mapReady]);
+  }, [filteredPois, routeWaypoints, activeTripData, selectedTripDay, mapReady]);
 
   // Viewport fit — runs only when the actual plotted POI set changes
   useEffect(() => {
@@ -996,70 +1078,79 @@ function SmartMapContent() {
 
           {/* ── TRIP MODE BANNER ── */}
           {tripModeLoading && (
-            <div className="mb-6 pt-4 flex items-center gap-3 px-5 py-3.5 bg-secondary/5 border border-secondary/20 rounded-2xl">
+            <div className="mb-6 pt-4 flex items-center gap-3 px-4 sm:px-5 py-3.5 bg-secondary/5 border border-secondary/20 rounded-2xl">
               <div className="w-5 h-5 border-2 border-secondary/30 border-t-secondary rounded-full animate-spin flex-shrink-0" />
-              <span className="text-sm text-on-surface-variant font-medium">Loading trip itinerary onto map...</span>
+              <span className="text-xs sm:text-sm text-on-surface-variant font-medium">Loading trip itinerary onto map...</span>
             </div>
           )}
 
           {!tripModeLoading && activeTripData && (
-            <div className="mb-6 pt-4">
-              <div className="flex flex-col gap-4 px-5 py-4 bg-secondary/8 border border-secondary/25 rounded-2xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-secondary/15 border border-secondary/25 flex items-center justify-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-secondary text-lg">route</span>
+            <div className="mb-6 pt-2 sm:pt-4">
+              <div className="flex flex-col gap-4 sm:gap-5 p-4 sm:p-5 bg-secondary/8 border border-secondary/25 rounded-2xl shadow-xs">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="hidden sm:flex w-10 h-10 rounded-xl bg-secondary/15 border border-secondary/25 items-center justify-center flex-shrink-0">
+                      <span className="material-symbols-outlined text-secondary text-xl">route</span>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="font-mono text-[10px] uppercase tracking-wider text-secondary font-bold">Trip Mode Active</span>
                         <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-bold border border-secondary/20">
                           {activeTripData.active_itinerary?.days?.reduce((a, d) => a + d.items.length, 0) || 0} stops plotted
                         </span>
                       </div>
-                      <p className="font-display font-semibold text-sm text-on-surface mt-0.5 line-clamp-1">
+                      <h2 className="font-display font-bold text-base sm:text-lg text-on-surface leading-snug">
                         {activeTripData.title}
-                      </p>
-                      <p className="text-xs text-on-surface-variant">
-                        {activeTripData.duration_days} days · PKR {activeTripData.total_budget.toLocaleString()} · {activeTripData.pace} pace
+                      </h2>
+                      <p className="text-xs text-on-surface-variant mt-1 flex items-center gap-2 flex-wrap font-mono">
+                        <span>{activeTripData.duration_days} days</span>
+                        <span>·</span>
+                        <span>PKR {activeTripData.total_budget.toLocaleString()}</span>
+                        <span>·</span>
+                        <span className="capitalize">{activeTripData.pace} pace</span>
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full lg:w-auto flex-shrink-0 pt-1 sm:pt-0">
                     <Link
                       href={`/trips/${activeTripData.id}?mode=live`}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary text-white text-xs font-semibold hover:bg-secondary-dark transition-all shadow-xs"
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-secondary text-white text-xs font-bold hover:bg-secondary-dark transition-all shadow-xs cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm">navigation</span>
-                      Live HUD
+                      <span>Live HUD</span>
                     </Link>
                     <Link
                       href={`/trips/${activeTripData.id}`}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant text-xs font-semibold text-on-surface hover:bg-surface-container transition-all"
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant text-xs font-semibold text-on-surface hover:bg-surface-container transition-all cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm text-secondary">arrow_back</span>
-                      Back to Itinerary
+                      <span>Back to Trip</span>
                     </Link>
                     <button
                       onClick={() => router.replace("/explore")}
-                      className="inline-flex items-center gap-1 p-2 rounded-xl bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all"
+                      className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all cursor-pointer"
                       title="Exit Trip Mode"
                       type="button"
                     >
                       <span className="material-symbols-outlined text-sm">close</span>
+                      <span className="sm:hidden text-xs font-semibold">Exit Trip Mode</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Day Filter Pills */}
                 {activeTripData.active_itinerary?.days && activeTripData.active_itinerary.days.length > 0 && (
-                  <div className="flex items-center gap-2 pt-3 border-t border-secondary/20 overflow-x-auto scrollbar-none">
+                  <div className="flex items-center gap-2 pt-3.5 border-t border-secondary/20 overflow-x-auto scrollbar-none">
                     <span className="text-xs font-mono font-bold text-secondary uppercase tracking-wider shrink-0 flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm">calendar_view_day</span>
                       Stage Filter:
                     </span>
                     <button
-                      onClick={() => setSelectedTripDay("all")}
+                      onClick={() => {
+                        setSelectedTripDay("all");
+                        const firstPoi = mergedPois[0];
+                        if (firstPoi) selectPlaceWithTimer(firstPoi.id);
+                      }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
                         selectedTripDay === "all"
                           ? "bg-secondary text-white shadow-xs font-bold"
@@ -1072,7 +1163,13 @@ function SmartMapContent() {
                     {activeTripData.active_itinerary.days.map((day) => (
                       <button
                         key={day.day_number}
-                        onClick={() => setSelectedTripDay(day.day_number)}
+                        onClick={() => {
+                          setSelectedTripDay(day.day_number);
+                          const firstDayItem = day.items[0];
+                          if (firstDayItem?.place?.id) {
+                            selectPlaceWithTimer(firstDayItem.place.id);
+                          }
+                        }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
                           selectedTripDay === day.day_number
                             ? "bg-secondary text-white shadow-xs font-bold"
@@ -1090,13 +1187,13 @@ function SmartMapContent() {
           )}
 
           {/* HERO HEADER & REGION ACCELERATOR */}
-          <div className="pt-4 pb-8 border-b border-outline-variant/60 mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="pt-2 sm:pt-4 pb-6 sm:pb-8 border-b border-outline-variant/60 mb-6 sm:mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 sm:gap-6">
               <div className="max-w-3xl">
-                <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-on-surface">
-                  WanderAI Smart Map & Spatial Intelligence
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-on-surface">
+                  WanderAI Smart Map &amp; Spatial Intelligence
                 </h1>
-                <p className="font-sans text-sm sm:text-base text-on-surface-variant mt-2.5 leading-relaxed max-w-2xl">
+                <p className="font-sans text-xs sm:text-sm text-on-surface-variant mt-2 leading-relaxed max-w-2xl">
                   {activeTripData
                     ? `Showing ${activeTripData.active_itinerary?.days?.reduce((a, d) => a + d.items.length, 0) || 0} itinerary stops from "${activeTripData.title}" — click any pin to see details.`
                     : "Bespoke spatial curation, real-time PostGIS GIS modeling, elevation contour analysis, and live solar tracking across Pakistan's historic & alpine corridors."
@@ -1113,7 +1210,7 @@ function SmartMapContent() {
                         key={reg.id}
                         onClick={() => {
                           setSelectedRegionId(reg.id);
-                          if (reg.pois[0]) setSelectedPlaceId(reg.pois[0].id);
+                          if (reg.pois[0]) selectPlaceWithTimer(reg.pois[0].id);
                         }}
                         className={`px-3.5 py-2 rounded-lg font-display text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                           selectedRegionId === reg.id
@@ -1160,10 +1257,10 @@ function SmartMapContent() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12">
             {/* ==================== LEFT COLUMN: SPATIAL DOSSIER (5 cols) ==================== */}
             <div className="lg:col-span-5 flex flex-col gap-6">
-              <section className="bg-surface-container-lowest p-6 sm:p-7 rounded-2xl border border-outline-variant shadow-luxury flex flex-col gap-5">
+              <section className="bg-surface-container-lowest p-4 sm:p-6 lg:p-7 rounded-2xl border border-outline-variant shadow-luxury flex flex-col gap-4 sm:gap-5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center font-bold">
+                  <div className="flex items-center gap-2 sm:gap-2.5">
+                    <span className="hidden sm:flex w-8 h-8 rounded-lg bg-secondary/10 text-secondary items-center justify-center font-bold">
                       <span className="material-symbols-outlined text-base">neurology</span>
                     </span>
                     <div>
@@ -1175,9 +1272,6 @@ function SmartMapContent() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-secondary-container/60 text-secondary font-semibold">
-                    PostGIS 3.4
-                  </span>
                 </div>
 
                 {/* Search Input */}
@@ -1282,24 +1376,19 @@ function SmartMapContent() {
                     (() => {
                       const originPoi = mergedPois.find((p) => p.id === "origin_city_start" || p.waypointNum === 0)!;
                       return (
-                        <div className="p-4 rounded-xl bg-surface-container-low border border-blue-500/30 flex items-center justify-between gap-3 shadow-xs">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-600/15 border border-blue-500/30 text-blue-600 flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-xl">my_location</span>
+                        <div className="p-3.5 sm:p-4 rounded-xl bg-surface-container-low border border-blue-500/30 flex items-center justify-between gap-3 shadow-xs">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-md">
+                                Trip Departure Vector
+                              </span>
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-md">
-                                  Trip Departure Vector
-                                </span>
-                              </div>
-                              <p className="text-sm font-extrabold text-on-surface mt-0.5">
-                                {originPoi.name}
-                              </p>
-                              <p className="text-xs text-on-surface-variant">
-                                Starting hub connecting to your planned itinerary.
-                              </p>
-                            </div>
+                            <p className="text-sm font-extrabold text-on-surface mt-0.5">
+                              {originPoi.name}
+                            </p>
+                            <p className="text-xs text-on-surface-variant">
+                              Starting hub connecting to your planned itinerary.
+                            </p>
                           </div>
                         </div>
                       );
@@ -1322,8 +1411,8 @@ function SmartMapContent() {
                     return (
                       <article
                         key={poi.id}
-                        onClick={() => setSelectedPlaceId(poi.id)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col gap-3.5 ${
+                        onClick={() => selectPlaceWithTimer(poi.id)}
+                        className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer flex flex-col gap-3 ${
                           isSelected
                             ? "bg-surface-container-lowest border-2 border-secondary shadow-md"
                             : isTripStop
@@ -1331,8 +1420,8 @@ function SmartMapContent() {
                             : "bg-surface-container-lowest border-outline-variant hover:border-secondary/40 shadow-xs"
                         }`}
                       >
-                        <div className="flex gap-4">
-                          <div className="w-28 h-28 rounded-xl overflow-hidden shrink-0 relative bg-surface-container border border-outline-variant">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                          <div className="w-full h-36 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 relative bg-surface-container border border-outline-variant">
                             {poi.image ? (
                               <img
                                 alt={poi.name}
@@ -1367,19 +1456,19 @@ function SmartMapContent() {
                               </span>
                             </button>
                           </div>
-                          <div className="flex flex-col flex-1 min-w-0 justify-between">
+                          <div className="flex flex-col flex-1 min-w-0 justify-between gap-1.5">
                             <div>
                               <div className="flex items-center justify-between gap-1 flex-wrap">
-                                <h3 className="font-display font-bold text-base text-on-surface truncate">
+                                <h3 className="font-display font-bold text-sm sm:text-base text-on-surface truncate">
                                   {poi.name}
                                 </h3>
                                 {isTripStop ? (
-                                  <span className="px-2 py-0.5 rounded-full bg-secondary text-white text-[11px] font-bold shrink-0 flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-full bg-secondary text-white text-[10px] font-bold shrink-0 flex items-center gap-1">
                                     <span className="material-symbols-outlined text-xs">route</span>
                                     Itinerary Stop
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold shrink-0">
+                                  <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold shrink-0">
                                     {poi.match}
                                   </span>
                                 )}
@@ -1388,15 +1477,15 @@ function SmartMapContent() {
                                 {poi.tagline}
                               </p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant font-mono mt-2">
-                              <span className="flex items-center gap-1 text-secondary font-semibold">
-                                <span className="material-symbols-outlined text-sm">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant font-mono mt-1">
+                              <span className="flex items-center gap-1 text-secondary font-semibold text-[11px]">
+                                <span className="material-symbols-outlined text-xs">
                                   schedule
                                 </span>
                                 {poi.hours}
                               </span>
-                              <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">
+                              <span className="flex items-center gap-1 text-[11px]">
+                                <span className="material-symbols-outlined text-xs">
                                   payments
                                 </span>
                                 {poi.price}
@@ -1405,8 +1494,8 @@ function SmartMapContent() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2.5 border-t border-outline-variant/60">
-                          <div className="flex items-center gap-1.5 text-xs text-on-surface">
+                        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 pt-2.5 border-t border-outline-variant/60">
+                          <div className="flex items-center gap-1 text-xs text-on-surface">
                             <span
                               className="material-symbols-outlined text-sm text-amber-500"
                               style={{ fontVariationSettings: "'FILL' 1" }}
@@ -1414,17 +1503,17 @@ function SmartMapContent() {
                               star
                             </span>
                             <span className="font-bold">{poi.rating}</span>
-                            <span className="text-on-surface-variant text-[11px]">
-                              ({poi.reviews} logs)
+                            <span className="text-on-surface-variant text-[10px] sm:text-[11px]">
+                              ({poi.reviews})
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedPlaceId(poi.id);
+                                selectPlaceWithTimer(poi.id);
                               }}
-                              className="px-3.5 py-1.5 rounded-xl border border-outline-variant hover:bg-surface-container-low text-xs font-semibold text-on-surface transition-colors cursor-pointer"
+                              className="px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl border border-outline-variant hover:bg-surface-container-low text-xs font-semibold text-on-surface transition-colors cursor-pointer"
                               type="button"
                             >
                               Inspect
@@ -1434,21 +1523,14 @@ function SmartMapContent() {
                                 e.stopPropagation();
                                 toggleRouteWaypoint(poi.id);
                               }}
-                              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer ${
+                              className={`px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
                                 inRoute
                                   ? "bg-secondary text-white hover:bg-secondary-dark"
                                   : "bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant"
                               }`}
                               type="button"
                             >
-                              {inRoute ? (
-                                <>
-                                  <span className="material-symbols-outlined text-sm">check</span>
-                                  <span>In Route</span>
-                                </>
-                              ) : (
-                                <span>+ Add to Route</span>
-                              )}
+                              {inRoute ? "In Route" : "+ Route"}
                             </button>
                           </div>
                         </div>
@@ -1491,31 +1573,31 @@ function SmartMapContent() {
                 <div ref={mapContainerRef} className="w-full h-full z-10" />
 
                 {/* Map Layer Controls Bar at Top */}
-                <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap sm:flex-nowrap items-center justify-between pointer-events-none gap-2">
+                <div className="absolute top-2.5 left-2.5 right-2.5 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap sm:flex-nowrap items-center justify-between pointer-events-none gap-2">
                   <div className="flex items-center p-1 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto overflow-x-auto scrollbar-none max-w-full">
                     {[
-                      { id: "topo", icon: "landscape", label: "Topographic" },
-                      { id: "golden", icon: "wb_twilight", label: `Golden Hour (${region.goldenHour})` },
-                      { id: "crowd", icon: "group", label: `Crowd (${region.crowdLevel})` },
-                      { id: "road", icon: "traffic", label: "Road Passability" },
+                      { id: "topo", icon: "landscape", label: "Topo" },
+                      { id: "golden", icon: "wb_twilight", label: `Golden (${region.goldenHour})` },
+                      { id: "crowd", icon: "group", label: `Crowds (${region.crowdLevel})` },
+                      { id: "road", icon: "traffic", label: "Roads" },
                     ].map((lyr) => (
                       <button
                         key={lyr.id}
                         onClick={() => setActiveLayer(lyr.id as any)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                           activeLayer === lyr.id
                             ? "bg-secondary text-white shadow-xs font-bold"
                             : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
                         }`}
                         type="button"
                       >
-                        <span className="material-symbols-outlined text-[15px]">{lyr.icon}</span>
+                        <span className="material-symbols-outlined text-sm sm:text-[15px]">{lyr.icon}</span>
                         <span>{lyr.label}</span>
                       </button>
                     ))}
                   </div>
 
-                  <div className="hidden sm:flex items-center gap-2 p-1.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto">
+                  <div className="hidden md:flex items-center gap-2 p-1.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto">
                     <span className="px-2.5 py-1 bg-surface-container-low rounded-lg text-[11px] font-mono text-on-surface font-semibold flex items-center gap-1">
                       <span className="material-symbols-outlined text-secondary text-sm">
                         navigation
@@ -1526,28 +1608,28 @@ function SmartMapContent() {
                 </div>
 
                 {/* Floating Map Zoom & GPS Controls */}
-                <div className="absolute top-16 right-3 sm:top-20 sm:right-4 z-20 flex flex-col bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-lg p-1">
+                <div className="absolute top-14 right-2.5 sm:top-20 sm:right-4 z-20 flex flex-col bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-lg p-1">
                   <button
                     onClick={handleZoomIn}
-                    className="p-1.5 sm:p-2 text-on-surface hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-on-surface hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer"
                     title="Zoom In"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-sm sm:text-base">add</span>
                   </button>
-                  <div className="h-[1px] bg-outline-variant mx-1.5" />
+                  <div className="h-[1px] bg-outline-variant mx-1" />
                   <button
                     onClick={handleZoomOut}
-                    className="p-1.5 sm:p-2 text-on-surface hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-on-surface hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer"
                     title="Zoom Out"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-sm sm:text-base">remove</span>
                   </button>
-                  <div className="h-[1px] bg-outline-variant mx-1.5" />
+                  <div className="h-[1px] bg-outline-variant mx-1" />
                   <button
                     onClick={handleRecenter}
-                    className="p-1.5 sm:p-2 text-secondary hover:bg-secondary/10 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-secondary hover:bg-secondary/10 rounded-lg transition-colors cursor-pointer"
                     title="GPS Re-Center"
                     type="button"
                   >
@@ -1555,43 +1637,139 @@ function SmartMapContent() {
                   </button>
                 </div>
 
-                {/* Floating Inspection Card */}
-                {selectedPoi && (
+                {/* ── Collapsed Floating Restore Pill on Map ── */}
+                {selectedPoi && isCardCollapsed && (
+                  <div className="absolute top-14 left-2 right-2 sm:right-auto sm:top-20 sm:left-4 z-30 sm:max-w-[340px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl border border-secondary/40 shadow-2xl p-2 sm:p-2.5 flex items-center justify-between gap-2 animate-fade-in">
+                    <button
+                      onClick={() => {
+                        cancelAutoCollapse();
+                        setIsCardCollapsed(false);
+                      }}
+                      className="flex items-center gap-2.5 min-w-0 flex-1 text-left hover:opacity-90 transition-opacity cursor-pointer group"
+                      type="button"
+                      title="Tap to view stop details"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center shrink-0 border border-secondary/25">
+                        <span className="material-symbols-outlined text-base">
+                          {selectedPoi.id === "origin_city_start" || selectedPoi.waypointNum === 0
+                            ? "my_location"
+                            : selectedPoi.category === "dining"
+                            ? "restaurant"
+                            : selectedPoi.category === "photopoint"
+                            ? "photo_camera"
+                            : "castle"}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-display font-bold text-xs text-on-surface truncate max-w-[140px] sm:max-w-[180px]">
+                            {selectedPoi.name}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded bg-secondary/10 text-secondary text-[9px] font-bold font-mono">
+                            {selectedPoi.waypointNum !== undefined && selectedPoi.waypointNum > 0
+                              ? `#${selectedPoi.waypointNum}`
+                              : selectedPoi.id === "origin_city_start"
+                              ? "Start"
+                              : selectedPoi.match}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-secondary font-semibold flex items-center gap-1 mt-0.5">
+                          <span>View stop details</span>
+                          <span className="material-symbols-outlined text-xs group-hover:translate-y-0.5 transition-transform">
+                            expand_more
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => {
+                          cancelAutoCollapse();
+                          setIsCardCollapsed(false);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-secondary text-white text-xs font-bold shadow-xs hover:bg-secondary-dark transition-all flex items-center gap-1 cursor-pointer"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-xs">open_in_full</span>
+                        <span className="hidden xs:inline">Details</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          cancelAutoCollapse();
+                          setSelectedPlaceId("");
+                        }}
+                        className="p-1 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer"
+                        type="button"
+                        title="Close selection"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Expanded Floating Inspection Card ── */}
+                {selectedPoi && !isCardCollapsed && (
                   selectedPoi.id === "origin_city_start" || selectedPoi.waypointNum === 0 ? (
-                    <div className="absolute top-16 left-3 right-3 sm:right-auto sm:top-20 sm:left-4 z-30 sm:max-w-[340px] bg-surface-container-lowest/98 backdrop-blur-xl rounded-2xl border border-blue-500/30 shadow-2xl overflow-hidden p-4 sm:p-5 flex flex-col gap-3 animate-fade-in">
+                    <div
+                      onMouseEnter={cancelAutoCollapse}
+                      onTouchStart={cancelAutoCollapse}
+                      onPointerDown={cancelAutoCollapse}
+                      className="absolute top-14 left-2 right-2 sm:right-auto sm:top-20 sm:left-4 z-30 sm:max-w-[340px] bg-surface-container-lowest/98 backdrop-blur-xl rounded-2xl border border-blue-500/30 shadow-2xl overflow-hidden p-3.5 sm:p-5 flex flex-col gap-2.5 sm:gap-3 animate-fade-in transition-all duration-300"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-7 h-7 rounded-lg bg-blue-600/15 text-blue-600 flex items-center justify-center font-bold">
-                            <span className="material-symbols-outlined text-base">my_location</span>
-                          </span>
                           <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-md">
                             Departure Origin Vector
                           </span>
                         </div>
-                        <button
-                          onClick={() => setSelectedPlaceId("")}
-                          className="p-1 text-on-surface-variant hover:text-on-surface rounded-md transition-colors cursor-pointer"
-                          type="button"
-                        >
-                          <span className="material-symbols-outlined text-sm">close</span>
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              cancelAutoCollapse();
+                              setIsCardCollapsed(true);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/60"
+                            type="button"
+                            title="Minimize to see full map"
+                          >
+                            <span className="material-symbols-outlined text-xs">unfold_less</span>
+                            <span>Minimize</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              cancelAutoCollapse();
+                              setSelectedPlaceId("");
+                            }}
+                            className="p-1 text-on-surface-variant hover:text-on-surface rounded-md transition-colors cursor-pointer"
+                            type="button"
+                            title="Close selection"
+                          >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        </div>
                       </div>
 
-                      <h3 className="font-display font-extrabold text-base text-on-surface">
+                      <h3 className="font-display font-extrabold text-sm sm:text-base text-on-surface">
                         {selectedPoi.name}
                       </h3>
                       <p className="text-xs text-on-surface-variant leading-relaxed">
                         {selectedPoi.desc}
                       </p>
 
-                      <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant flex items-center justify-between text-xs font-mono">
-                        <span className="text-on-surface-variant font-sans font-semibold">Starting Hub:</span>
-                        <span className="font-bold text-blue-600">{selectedPoi.name.replace(/^Start:\s*/, '')}</span>
+                      <div className="p-2 rounded-xl bg-surface-container-low border border-outline-variant flex items-center justify-between text-xs font-mono">
+                        <span className="text-on-surface-variant font-sans font-semibold text-[11px]">Starting Hub:</span>
+                        <span className="font-bold text-blue-600 text-[11px]">{selectedPoi.name.replace(/^Start:\s*/, '')}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="absolute top-16 left-3 right-3 sm:right-auto sm:top-20 sm:left-4 z-30 sm:max-w-[360px] bg-surface-container-lowest/98 backdrop-blur-xl rounded-2xl border border-outline-variant shadow-2xl overflow-hidden">
-                      <div className="relative h-32 sm:h-40 w-full overflow-hidden bg-surface-container">
+                    <div
+                      onMouseEnter={cancelAutoCollapse}
+                      onTouchStart={cancelAutoCollapse}
+                      onPointerDown={cancelAutoCollapse}
+                      className="absolute top-14 left-2 right-2 sm:right-auto sm:top-20 sm:left-4 z-30 sm:max-w-[340px] bg-surface-container-lowest/98 backdrop-blur-xl rounded-2xl border border-outline-variant shadow-2xl overflow-hidden max-h-[70vh] sm:max-h-none overflow-y-auto animate-fade-in transition-all duration-300"
+                    >
+                      <div className="relative h-28 sm:h-36 w-full overflow-hidden bg-surface-container">
                         <img
                           alt={selectedPoi.name}
                           className="w-full h-full object-cover"
@@ -1613,14 +1791,39 @@ function SmartMapContent() {
                           <h3 className="font-display font-bold text-sm sm:text-base text-on-surface">
                             {selectedPoi.name}
                           </h3>
-                          <div className="flex items-center gap-1 text-xs font-bold text-on-surface">
-                            <span
-                              className="material-symbols-outlined text-sm text-amber-500"
-                              style={{ fontVariationSettings: "'FILL' 1" }}
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 text-xs font-bold text-on-surface">
+                              <span
+                                className="material-symbols-outlined text-sm text-amber-500"
+                                style={{ fontVariationSettings: "'FILL' 1" }}
+                              >
+                                star
+                              </span>
+                              <span>{selectedPoi.rating}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                cancelAutoCollapse();
+                                setIsCardCollapsed(true);
+                              }}
+                              className="px-2 py-0.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface text-[10px] font-semibold flex items-center gap-0.5 transition-colors cursor-pointer border border-outline-variant/60"
+                              type="button"
+                              title="Minimize to see full map"
                             >
-                              star
-                            </span>
-                            <span>{selectedPoi.rating}</span>
+                              <span className="material-symbols-outlined text-xs">unfold_less</span>
+                              <span>Minimize</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                cancelAutoCollapse();
+                                setSelectedPlaceId("");
+                              }}
+                              className="p-0.5 text-on-surface-variant hover:text-on-surface rounded-md transition-colors cursor-pointer"
+                              type="button"
+                              title="Close selection"
+                            >
+                              <span className="material-symbols-outlined text-sm">close</span>
+                            </button>
                           </div>
                         </div>
 
@@ -1683,67 +1886,95 @@ function SmartMapContent() {
                   )
                 )}
 
-                {/* Bottom Route & Elevation HUD */}
-                <div className="absolute bottom-3 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 flex justify-center pointer-events-none">
-                  <div className="w-full bg-surface-container-lowest/98 backdrop-blur-xl p-3 sm:p-3.5 rounded-2xl border border-outline-variant shadow-2xl pointer-events-auto flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
-                    <div className="flex items-center gap-2.5 w-full md:w-auto overflow-hidden">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-lg sm:text-xl">directions_walk</span>
+                {/* ── Collapsed Bottom Route Pill ── */}
+                {isRouteHudCollapsed && (
+                  <div className="absolute bottom-2.5 left-2.5 z-30 animate-fade-in">
+                    <button
+                      onClick={() => setIsRouteHudCollapsed(false)}
+                      className="px-3 py-2 rounded-xl bg-surface-container-lowest/95 backdrop-blur-xl border border-outline-variant shadow-xl text-on-surface text-xs font-bold flex items-center gap-1.5 hover:bg-surface-container transition-all cursor-pointer"
+                      type="button"
+                      title="Expand route and navigation bar"
+                    >
+                      <span className="material-symbols-outlined text-sm text-secondary">route</span>
+                      <span>Route ({routeWaypoints.length} Stops)</span>
+                      <span className="material-symbols-outlined text-xs">keyboard_arrow_up</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Expanded Bottom Route & Elevation HUD ── */}
+                {!isRouteHudCollapsed && (
+                  <div className="absolute bottom-2.5 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 flex justify-center pointer-events-none">
+                    <div className="w-full bg-surface-container-lowest/98 backdrop-blur-xl p-3 sm:p-3.5 rounded-2xl border border-outline-variant shadow-2xl pointer-events-auto flex flex-col md:flex-row items-center justify-between gap-2.5 md:gap-4 animate-fade-in">
+                      <div className="flex items-center justify-between w-full md:w-auto gap-2 overflow-hidden">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="hidden sm:flex w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-secondary-container text-on-secondary-container items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-lg sm:text-xl">directions_walk</span>
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-secondary font-bold">
+                              Active Multi-Stop Walk
+                            </span>
+                            <div className="flex items-center gap-1 text-xs font-bold text-on-surface truncate">
+                              {routeWaypoints.map((id, idx) => {
+                                const poi = mergedPois.find((p) => p.id === id);
+                                if (!poi) return null;
+                                return (
+                                  <span key={id} className="flex items-center gap-1">
+                                    <span>{poi.name.split(" ")[0]}</span>
+                                    {idx < routeWaypoints.length - 1 && (
+                                      <span className="text-outline-variant">➔</span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setIsRouteHudCollapsed(true)}
+                          className="md:hidden p-1 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer shrink-0"
+                          type="button"
+                          title="Minimize route bar"
+                        >
+                          <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                        </button>
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-secondary font-bold">
-                          Active Multi-Stop Walk
-                        </span>
-                        <div className="flex items-center gap-1 text-xs font-bold text-on-surface truncate">
-                          {routeWaypoints.map((id, idx) => {
-                            const poi = mergedPois.find((p) => p.id === id);
-                            if (!poi) return null;
-                            return (
-                              <span key={id} className="flex items-center gap-1">
-                                <span>{poi.name.split(" ")[0]}</span>
-                                {idx < routeWaypoints.length - 1 && (
-                                  <span className="text-outline-variant">➔</span>
-                                )}
-                              </span>
-                            );
-                          })}
+
+                      <div className="hidden sm:flex items-center gap-4 text-xs font-mono shrink-0 border-y md:border-y-0 md:border-x border-outline-variant/60 py-2 md:py-0 md:px-5">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-sans uppercase text-on-surface-variant font-semibold">
+                            Total Vector
+                          </span>
+                          <span className="font-bold text-on-surface text-xs">
+                            {region.walkVector} <span className="font-normal text-secondary">({region.walkTime})</span>
+                          </span>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="hidden sm:flex items-center gap-4 text-xs font-mono shrink-0 border-y md:border-y-0 md:border-x border-outline-variant/60 py-2 md:py-0 md:px-5">
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-sans uppercase text-on-surface-variant font-semibold">
-                          Total Vector
-                        </span>
-                        <span className="font-bold text-on-surface text-xs">
-                          {region.walkVector} <span className="font-normal text-secondary">({region.walkTime})</span>
-                        </span>
+                      <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full md:w-auto shrink-0 justify-end">
+                        <button
+                          onClick={handleExportGpx}
+                          className="px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          title="Export GPX File"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-sm">download</span>
+                          <span>Export GPX</span>
+                        </button>
+                        <button
+                          onClick={handleCreateExpedition}
+                          disabled={isCreatingTrip}
+                          className="px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark transition-all shadow-md flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer disabled:opacity-60"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-base">near_me</span>
+                          <span>{isCreatingTrip ? "Building..." : "Expedition"}</span>
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 w-full md:w-auto shrink-0 justify-end">
-                      <button
-                        onClick={handleExportGpx}
-                        className="flex-1 md:flex-none px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                        title="Export GPX File"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-sm">download</span>
-                        <span>Export GPX</span>
-                      </button>
-                      <button
-                        onClick={handleCreateExpedition}
-                        disabled={isCreatingTrip}
-                        className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark transition-all shadow-md flex items-center justify-center gap-2 text-xs font-bold cursor-pointer disabled:opacity-60"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-base">near_me</span>
-                        <span>{isCreatingTrip ? "Building..." : "Create Expedition"}</span>
-                      </button>
-                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

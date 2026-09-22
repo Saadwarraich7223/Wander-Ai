@@ -132,6 +132,7 @@ function PlannerContent() {
 
   const [travelStyle, setTravelStyle] = useState<"solo" | "couple" | "family" | "crew">("solo");
   const [transitMode, setTransitMode] = useState<"car" | "flight" | "bus" | "hybrid">("car");
+  const [vehicleClass, setVehicleClass] = useState<"sedan" | "crossover" | "suv_4x4">("crossover");
   const [lodgingStyle, setLodgingStyle] = useState<"glamping" | "midrange" | "homestay">("glamping");
   const [pace, setPace] = useState<"relaxed" | "balanced" | "intensive">("balanced");
   const [mode, setMode] = useState<"bespoke" | "precalibrated" | "prompt">("bespoke");
@@ -855,6 +856,44 @@ function PlannerContent() {
       .map((opt) => opt.label.replace(/^[^\s]+ /, ""))
       .slice(0, 2);
   }, [destinationMatrix, selectedInterests]);
+
+  // Fuel Logistics & Topographic Range Calculations
+  const fuelLogistics = useMemo(() => {
+    const roundTripDistanceKm = Math.round(routeMetrics.drivingDistanceKm * 2 + daysCount * 35);
+    const isMountain = (destinationLocation?.elevation_m || 0) > 1500;
+
+    let kmPerLiter = 14;
+    let fuelType = "Super Unleaded (92 Octane)";
+    let pricePerLiter = 275;
+    let vehicleName = "Sedan (Civic / City / Corolla)";
+
+    if (vehicleClass === "crossover") {
+      kmPerLiter = isMountain ? 9.5 : 11.5;
+      pricePerLiter = 275;
+      vehicleName = "Crossover / Light SUV (Sportage / Tucson / Vezel)";
+    } else if (vehicleClass === "suv_4x4") {
+      kmPerLiter = isMountain ? 6.5 : 8.0;
+      fuelType = "High-Torque Diesel / Hi-Octane";
+      pricePerLiter = 285;
+      vehicleName = "Heavy 4x4 Rig (LC Prado / Hilux / LC76)";
+    } else {
+      kmPerLiter = isMountain ? 11.5 : 14.0;
+    }
+
+    const litersRequired = Math.ceil(roundTripDistanceKm / kmPerLiter);
+    const estimatedFuelCostPkr = litersRequired * pricePerLiter;
+
+    return {
+      roundTripDistanceKm,
+      vehicleName,
+      kmPerLiter,
+      litersRequired,
+      pricePerLiter,
+      fuelType,
+      estimatedFuelCostPkr,
+      isMountain,
+    };
+  }, [routeMetrics.drivingDistanceKm, daysCount, destinationLocation, vehicleClass]);
 
   return (
     <div className="bg-background text-on-surface antialiased font-sans selection:bg-secondary-container selection:text-on-secondary-container min-h-screen flex flex-col">
@@ -1610,6 +1649,88 @@ function PlannerContent() {
                     </div>
                   </div>
 
+                  {/* Vehicle Archetype & Fuel Logistics Engine */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-medium">
+                        Vehicle Rig & Fuel Consumption
+                      </label>
+                      <span className="font-mono text-[11px] text-secondary font-semibold">
+                        ~PKR {fuelLogistics.estimatedFuelCostPkr.toLocaleString()} Est. Fuel
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-3">
+                      {[
+                        {
+                          id: "sedan",
+                          title: "Sedan / Saloon",
+                          spec: "14 km/L · Motorways & Plains",
+                          icon: "directions_car",
+                        },
+                        {
+                          id: "crossover",
+                          title: "Crossover / Compact SUV",
+                          spec: "10 km/L · Valleys & Hill Stations",
+                          icon: "minor_crash",
+                        },
+                        {
+                          id: "suv_4x4",
+                          title: "Heavy 4x4 Overlander",
+                          spec: "7 km/L · Passes, Deosai & Dunes",
+                          icon: "terrain",
+                        },
+                      ].map((vh) => (
+                        <button
+                          key={vh.id}
+                          onClick={() => setVehicleClass(vh.id as any)}
+                          className={`p-3 rounded-xl border text-left flex flex-col gap-1 cursor-pointer transition-all ${
+                            vehicleClass === vh.id
+                              ? "bg-surface-container-low border-2 border-secondary shadow-xs"
+                              : "bg-surface-container-low border-outline-variant hover:bg-surface-container"
+                          }`}
+                          type="button"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`material-symbols-outlined text-lg ${
+                                vehicleClass === vh.id ? "text-secondary" : "text-on-surface-variant"
+                              }`}
+                            >
+                              {vh.icon}
+                            </span>
+                            {vehicleClass === vh.id && (
+                              <span className="w-2 h-2 rounded-full bg-secondary" />
+                            )}
+                          </div>
+                          <span className="font-display font-bold text-xs text-on-surface">
+                            {vh.title}
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant">{vh.spec}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Fuel Consumption Readout Box */}
+                    <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant text-xs space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-mono text-[11px] text-on-surface-variant flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm text-secondary">local_gas_station</span>
+                          {fuelLogistics.litersRequired} Litres required for ~{fuelLogistics.roundTripDistanceKm} km round expedition
+                        </span>
+                        <span className="font-mono font-bold text-on-surface text-[11px]">
+                          Rs. {fuelLogistics.estimatedFuelCostPkr.toLocaleString()} ({currency === "USD" ? `$${Math.round(fuelLogistics.estimatedFuelCostPkr / usdRate)}` : `PKR @ Rs. ${fuelLogistics.pricePerLiter}/L`})
+                        </span>
+                      </div>
+                      {fuelLogistics.isMountain && (
+                        <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-900 text-[11px] flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm text-amber-700 shrink-0">warning</span>
+                          <span>High-altitude mountain terrain applies a 20% fuel efficiency gradient penalty. Daylight driving recommended.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Lodging Architecture */}
                   <div>
                     <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-medium mb-2">
@@ -1870,6 +1991,26 @@ function PlannerContent() {
                     <span>Driving Distance: ~{routeMetrics.drivingDistanceKm} km</span>
                     <span className="font-mono text-secondary font-semibold">
                       {routeMetrics.roadPassabilityPercent}% Passability
+                    </span>
+                  </div>
+                </div>
+
+                {/* Fuel & Expedition Logistics Summary */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant mb-4 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono font-semibold">
+                    <span className="text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-secondary">local_gas_station</span>
+                      Vehicle & Fuel Allocation
+                    </span>
+                    <span className="text-secondary font-bold">Rs. {fuelLogistics.estimatedFuelCostPkr.toLocaleString()}</span>
+                  </div>
+                  <div className="text-xs text-on-surface font-semibold truncate">
+                    {fuelLogistics.vehicleName}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant pt-1 border-t border-outline-variant/50">
+                    <span>~{fuelLogistics.litersRequired}L @ {fuelLogistics.kmPerLiter} km/L</span>
+                    <span className="font-mono text-emerald-800 font-semibold">
+                      {fuelLogistics.roundTripDistanceKm} km round trip
                     </span>
                   </div>
                 </div>

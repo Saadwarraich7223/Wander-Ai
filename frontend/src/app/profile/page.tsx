@@ -52,8 +52,8 @@ export default function UserProfilePage() {
   const [editTravelStyle, setEditTravelStyle] = useState("adventure");
   const [editAltitudeCap, setEditAltitudeCap] = useState(3500);
 
-  // Persona State
-  const [activePersona, setActivePersona] = useState<"solo" | "duo" | "expedition">("solo");
+  // Persona Archetype State
+  const [activePersona, setActivePersona] = useState<"overlander" | "heritage" | "backpacker" | "family">("overlander");
   const [registryTab, setRegistryTab] = useState<"saved" | "visited">("saved");
   const [filterType, setFilterType] = useState<"all" | "alpine" | "unesco" | "lake" | "4x4">("all");
 
@@ -422,11 +422,11 @@ export default function UserProfilePage() {
 
             {/* Identity Row */}
             <div className="max-w-[1440px] mx-auto px-4 sm:px-8 pb-8">
-              <div className="relative -mt-16 md:-mt-20 flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
+              <div className="relative -mt-14 sm:-mt-16 md:-mt-20 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-6">
                 {/* Avatar & Main Identification */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
-                  <div className="relative group">
-                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl overflow-hidden bg-surface-container-lowest shadow-md p-1.5 border border-outline-variant/60">
+                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6 w-full lg:w-auto">
+                  <div className="relative group shrink-0">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl overflow-hidden bg-surface-container-lowest shadow-md p-1.5 border border-outline-variant/60">
                       {avatarUrl ? (
                         <img
                           className="w-full h-full object-cover rounded-xl"
@@ -434,7 +434,7 @@ export default function UserProfilePage() {
                           src={avatarUrl}
                         />
                       ) : (
-                        <div className="w-full h-full rounded-xl bg-secondary text-white font-display font-extrabold text-4xl flex items-center justify-center shadow-inner">
+                        <div className="w-full h-full rounded-xl bg-secondary text-white font-display font-extrabold text-3xl sm:text-4xl flex items-center justify-center shadow-inner">
                           {userInitial}
                         </div>
                       )}
@@ -445,36 +445,36 @@ export default function UserProfilePage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight">
+                      <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-extrabold text-on-surface tracking-tight break-words">
                         {displayName}
                       </h1>
                       {isAdmin && (
-                        <span className="px-3 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 text-xs font-mono font-bold tracking-wide border border-emerald-500/30">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 text-xs font-mono font-bold tracking-wide border border-emerald-500/30 shrink-0">
                           Admin Privileges
                         </span>
                       )}
-                      <span className="px-3 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium">
+                      <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium shrink-0">
                         {editTravelStyle.charAt(0).toUpperCase() + editTravelStyle.slice(1)} Explorer
                       </span>
                     </div>
-                    <p className="text-sm font-semibold text-on-surface-variant">
+                    <p className="text-xs sm:text-sm font-semibold text-on-surface-variant">
                       Traveler DNA · {editBudget.charAt(0).toUpperCase() + editBudget.slice(1)} Tier · Max {editAltitudeCap}m Altitude
                     </p>
 
                     {/* Metadata Line */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-on-surface-variant text-xs font-sans">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-on-surface-variant text-xs font-sans">
                       <span className="flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm text-secondary">mail</span>
-                        {displayEmail}
+                        <span className="break-all">{displayEmail}</span>
                       </span>
-                      <span className="text-outline-variant">•</span>
+                      <span className="text-outline-variant hidden sm:inline">•</span>
                       <span className="flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm text-secondary">calendar_month</span>
                         Member since {memberDate}
                       </span>
-                      <span className="text-outline-variant">•</span>
+                      <span className="text-outline-variant hidden sm:inline">•</span>
                       <span className="flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm text-emerald-600">verified_user</span>
                         Backend Synced
@@ -484,12 +484,12 @@ export default function UserProfilePage() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full lg:w-auto">
                   {/* Direct Link to Admin Panel - Visible only to admins */}
                   {isAdmin && (
                     <Link
                       href="/admin"
-                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-emerald-400 hover:bg-slate-800 transition-colors font-semibold text-xs border border-emerald-500/30 shadow-xs cursor-pointer"
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-emerald-400 hover:bg-slate-800 transition-colors font-semibold text-xs border border-emerald-500/30 shadow-xs cursor-pointer text-center"
                       title="Access Destination Studio & Content Management"
                     >
                       <span className="material-symbols-outlined text-base">admin_panel_settings</span>
@@ -504,7 +504,7 @@ export default function UserProfilePage() {
                       }
                       triggerToast("Profile link copied to clipboard.");
                     }}
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-semibold text-xs cursor-pointer border border-outline-variant/60"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-semibold text-xs cursor-pointer border border-outline-variant/60 text-center"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base">share</span>
@@ -513,7 +513,7 @@ export default function UserProfilePage() {
 
                   <button
                     onClick={() => setIsEditModalOpen(true)}
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors shadow-xs font-semibold text-xs cursor-pointer"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors shadow-xs font-semibold text-xs cursor-pointer text-center"
                     type="button"
                   >
                     <span className="material-symbols-outlined text-base">tune</span>
@@ -525,10 +525,10 @@ export default function UserProfilePage() {
           </section>
 
           {/* Explorer Telemetry & Real Lifetime Stats Ribbon */}
-          <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 py-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 py-6 sm:py-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
               {/* Metric 1: Real Planned Corridors */}
-              <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant">
                     Planned Distance
@@ -539,16 +539,16 @@ export default function UserProfilePage() {
                 </div>
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-display text-4xl font-extrabold tracking-tight text-on-surface">
+                    <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface">
                       {totalKmCorridors.toLocaleString()}
                     </span>
                     <span className="text-sm font-semibold text-on-surface-variant">km</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-secondary text-xs font-bold">
                     <span className="material-symbols-outlined text-sm">trending_up</span>
-                    <span>
+                    <span className="truncate">
                       {userTrips.length > 0
-                        ? `Across ${userTrips.length} custom itinerary routes`
+                        ? `Across ${userTrips.length} custom itineraries`
                         : "Ready for your first expedition"}
                     </span>
                   </div>
@@ -556,7 +556,7 @@ export default function UserProfilePage() {
               </div>
 
               {/* Metric 2: Real Expeditions */}
-              <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant">
                     Active Expeditions
@@ -567,7 +567,7 @@ export default function UserProfilePage() {
                 </div>
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-display text-4xl font-extrabold tracking-tight text-on-surface">
+                    <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface">
                       {userTrips.length}
                     </span>
                     <span className="text-xs font-bold text-secondary">
@@ -582,7 +582,7 @@ export default function UserProfilePage() {
               </div>
 
               {/* Metric 3: Saved Places & Bookmarks */}
-              <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">
                     Saved Bookmarks
@@ -593,14 +593,14 @@ export default function UserProfilePage() {
                 </div>
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-display text-4xl font-extrabold tracking-tight text-on-surface">
+                    <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface">
                       {savedPlaces.length}
                     </span>
                     <span className="text-sm font-semibold text-on-surface-variant">Places</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-secondary text-xs font-bold">
                     <span className="material-symbols-outlined text-sm">bookmark_add</span>
-                    <span>
+                    <span className="truncate">
                       {savedPlaces.length > 0
                         ? `${savedPlaces.length} destinations bookmarked`
                         : "No saved spots yet"}
@@ -610,7 +610,7 @@ export default function UserProfilePage() {
               </div>
 
               {/* Metric 4: Visited / Verified Logs */}
-              <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl shadow-xs border border-outline-variant/60 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant">
                     Field Logs
@@ -621,7 +621,7 @@ export default function UserProfilePage() {
                 </div>
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-display text-4xl font-extrabold tracking-tight text-on-surface">
+                    <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface">
                       {visitedPlaces.length}
                     </span>
                     <span className="text-sm font-semibold text-on-surface-variant">Visited</span>
@@ -636,12 +636,12 @@ export default function UserProfilePage() {
 
           {/* Two-Column Core Layout */}
           <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 pb-16">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
               {/* LEFT COLUMN: Main Dossier & Travel DNA (8 Cols) */}
-              <div className="lg:col-span-8 flex flex-col gap-8">
+              <div className="lg:col-span-8 flex flex-col gap-6 sm:gap-8 min-w-0">
                 {/* Travel DNA & Algorithmic Preference Matrix Card */}
-                <div className="bg-surface-container-lowest rounded-3xl p-6 sm:p-8 shadow-xs border border-outline-variant/60">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-outline-variant/40">
+                <div className="bg-surface-container-lowest rounded-3xl p-5 sm:p-8 shadow-xs border border-outline-variant/60">
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-6 border-b border-outline-variant/40">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">
@@ -655,27 +655,40 @@ export default function UserProfilePage() {
                       </h2>
                     </div>
 
-                    {/* Persona Switcher Pill */}
-                    <div className="flex flex-wrap sm:inline-flex p-1 bg-surface-container rounded-2xl sm:rounded-full self-start sm:self-auto border border-outline-variant/60">
+                    {/* Persona Archetype Switcher Pills */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap p-1 bg-surface-container rounded-2xl gap-1 border border-outline-variant/60 w-full xl:w-auto">
                       {[
-                        { id: "solo", label: "Solo Explorer" },
-                        { id: "duo", label: "Duo / Crew" },
-                        { id: "expedition", label: "Expedition Lead" },
+                        { id: "overlander", label: "Alpine 4x4", icon: "terrain", style: "adventure", alt: 4700 },
+                        { id: "heritage", label: "Heritage Connoisseur", icon: "fort", style: "cultural", alt: 2800 },
+                        { id: "backpacker", label: "Solo Backpacker", icon: "hiking", style: "adventure", alt: 3800 },
+                        { id: "family", label: "Family Comfort", icon: "family_restroom", style: "luxury", alt: 2400 },
                       ].map((p) => (
                         <button
                           key={p.id}
-                          onClick={() => {
+                          onClick={async () => {
                             setActivePersona(p.id as any);
-                            triggerToast(`Switched active persona to ${p.label}`);
+                            setEditTravelStyle(p.style);
+                            setEditAltitudeCap(p.alt);
+                            triggerToast(`Calibrated to ${p.label}. Saved to database.`);
+                            try {
+                              await usersApi.upsertProfile({
+                                preferred_budget: editBudget,
+                                travel_style: p.style,
+                                max_altitude_preference_m: p.alt,
+                              });
+                            } catch (e) {
+                              // non-blocking
+                            }
                           }}
-                          className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center ${
                             activePersona === p.id
-                              ? "bg-surface-container-lowest text-on-surface shadow-xs"
-                              : "text-on-surface-variant hover:text-on-surface"
+                              ? "bg-secondary text-white shadow-xs font-bold"
+                              : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
                           }`}
                           type="button"
                         >
-                          {p.label}
+                          <span className="material-symbols-outlined text-sm">{p.icon}</span>
+                          <span>{p.label}</span>
                         </button>
                       ))}
                     </div>
@@ -683,23 +696,23 @@ export default function UserProfilePage() {
 
                   {/* Affinity Matrix Dimensions */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 pt-6">
-                    {/* Dimension 1 */}
+                    {/* Dimension 1: High-Altitude Alpine */}
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="font-semibold text-sm text-on-surface flex items-center gap-2">
+                        <span className="font-semibold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 sm:gap-2">
                           <span className="material-symbols-outlined text-base text-secondary">
                             filter_hdr
                           </span>
                           High-Altitude Alpine Passes
                         </span>
                         <span className="text-xs font-mono font-bold text-secondary">
-                          {editTravelStyle === "adventure" ? "92%" : "78%"} Affinity
+                          {activePersona === "overlander" ? "98%" : activePersona === "backpacker" ? "88%" : activePersona === "heritage" ? "60%" : "50%"} Affinity
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-surface-container overflow-hidden">
                         <div
-                          className="h-full bg-secondary rounded-full"
-                          style={{ width: editTravelStyle === "adventure" ? "92%" : "78%" }}
+                          className="h-full bg-secondary rounded-full transition-all duration-500"
+                          style={{ width: activePersona === "overlander" ? "98%" : activePersona === "backpacker" ? "88%" : activePersona === "heritage" ? "60%" : "50%" }}
                         />
                       </div>
                       <span className="text-xs text-on-surface-variant">
@@ -707,76 +720,81 @@ export default function UserProfilePage() {
                       </span>
                     </div>
 
-                    {/* Dimension 2 */}
+                    {/* Dimension 2: UNESCO & Historic Forts */}
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="font-semibold text-sm text-on-surface flex items-center gap-2">
+                        <span className="font-semibold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 sm:gap-2">
                           <span className="material-symbols-outlined text-base text-secondary">
                             castle
                           </span>
                           UNESCO &amp; Historic Forts
                         </span>
                         <span className="text-xs font-mono font-bold text-secondary">
-                          {editTravelStyle === "cultural" ? "95%" : "84%"} Affinity
+                          {activePersona === "heritage" ? "98%" : activePersona === "family" ? "88%" : activePersona === "backpacker" ? "78%" : "65%"} Affinity
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-surface-container overflow-hidden">
                         <div
-                          className="h-full bg-secondary rounded-full"
-                          style={{ width: editTravelStyle === "cultural" ? "95%" : "84%" }}
+                          className="h-full bg-secondary rounded-full transition-all duration-500"
+                          style={{ width: activePersona === "heritage" ? "98%" : activePersona === "family" ? "88%" : activePersona === "backpacker" ? "78%" : "65%" }}
                         />
                       </div>
                       <span className="text-xs text-on-surface-variant">
-                        Historical Silk Road forts, Altit, Baltit, Lahore &amp; Rohtas
+                        Historical Silk Road forts, Altit, Baltit, Derawar &amp; Rohtas
                       </span>
                     </div>
 
-                    {/* Dimension 3 */}
+                    {/* Dimension 3: Lakes & Scenic Valleys */}
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="font-semibold text-sm text-on-surface flex items-center gap-2">
+                        <span className="font-semibold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 sm:gap-2">
                           <span className="material-symbols-outlined text-base text-secondary">
                             water_drop
                           </span>
                           Lakes &amp; Scenic Valleys
                         </span>
-                        <span className="text-xs font-mono font-bold text-secondary">88% Affinity</span>
+                        <span className="text-xs font-mono font-bold text-secondary">
+                          {activePersona === "backpacker" ? "96%" : activePersona === "overlander" ? "90%" : "85%"} Affinity
+                        </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-surface-container overflow-hidden">
-                        <div className="h-full bg-secondary rounded-full" style={{ width: "88%" }} />
+                        <div
+                          className="h-full bg-secondary rounded-full transition-all duration-500"
+                          style={{ width: activePersona === "backpacker" ? "96%" : activePersona === "overlander" ? "90%" : "85%" }}
+                        />
                       </div>
                       <span className="text-xs text-on-surface-variant">
-                        Attabad, Saif-ul-Malook, Shangrila, &amp; Rush Lake
+                        Attabad, Saif-ul-Malook, Shangrila &amp; Sheosar Lake
                       </span>
                     </div>
 
-                    {/* Dimension 4 */}
+                    {/* Dimension 4: Off-Road 4x4 Corridors */}
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="font-semibold text-sm text-on-surface flex items-center gap-2">
+                        <span className="font-semibold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 sm:gap-2">
                           <span className="material-symbols-outlined text-base text-secondary">
                             minor_crash
                           </span>
                           Off-Road 4x4 Corridors
                         </span>
                         <span className="text-xs font-mono font-bold text-secondary">
-                          {editTravelStyle === "adventure" ? "88%" : "65%"} Affinity
+                          {activePersona === "overlander" ? "98%" : activePersona === "backpacker" ? "75%" : "45%"} Affinity
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-surface-container overflow-hidden">
                         <div
-                          className="h-full bg-secondary rounded-full"
-                          style={{ width: editTravelStyle === "adventure" ? "88%" : "65%" }}
+                          className="h-full bg-secondary rounded-full transition-all duration-500"
+                          style={{ width: activePersona === "overlander" ? "98%" : activePersona === "backpacker" ? "75%" : "45%" }}
                         />
                       </div>
                       <span className="text-xs text-on-surface-variant">
-                        Deosai Plains, Shandur, &amp; Fairy Meadows trails
+                        Deosai Plateau, Babusar, Shimshal &amp; Cholistan Dunes
                       </span>
                     </div>
                   </div>
 
                   {/* Operational Parameters Strip */}
-                  <div className="mt-8 pt-6 bg-surface-container-low rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 border border-outline-variant/40">
+                  <div className="mt-6 sm:mt-8 pt-6 bg-surface-container-low rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 border border-outline-variant/40">
                     <div className="flex flex-col gap-1">
                       <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
                         Budget Tier
@@ -802,8 +820,8 @@ export default function UserProfilePage() {
                 </div>
 
                 {/* Expeditions & Saved Journeys Section */}
-                <div className="bg-surface-container-lowest rounded-3xl p-6 sm:p-8 shadow-xs border border-outline-variant/60 flex flex-col gap-6">
-                  <div className="flex items-center justify-between">
+                <div className="bg-surface-container-lowest rounded-3xl p-5 sm:p-8 shadow-xs border border-outline-variant/60 flex flex-col gap-5 sm:gap-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                     <div>
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">
                         Waypoint Corridors
@@ -813,7 +831,7 @@ export default function UserProfilePage() {
                       </h2>
                     </div>
                     <Link
-                      className="text-xs font-bold text-secondary hover:underline flex items-center gap-1"
+                      className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 self-start sm:self-auto"
                       href="/planner"
                     >
                       <span className="material-symbols-outlined text-sm">add_circle</span>
@@ -827,46 +845,47 @@ export default function UserProfilePage() {
                       userTrips.map((trip) => (
                         <div
                           key={trip.id}
-                          className="bg-surface-container-low rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 hover:bg-surface-container transition-colors group border border-outline-variant/40"
+                          className="bg-surface-container-low rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-surface-container transition-colors group border border-outline-variant/40"
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary">
-                              <span className="material-symbols-outlined text-3xl">route</span>
+                          <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 flex-1 min-w-0">
+                            {/* Hide bulky route icon on small screens to give full space to expedition title & details */}
+                            <div className="hidden sm:flex w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-secondary/10 border border-secondary/20 items-center justify-center text-secondary">
+                              <span className="material-symbols-outlined text-2xl sm:text-3xl">route</span>
                             </div>
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1 min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-display font-bold text-base text-on-surface">
+                                <span className="font-display font-bold text-sm sm:text-base text-on-surface break-words">
                                   {trip.title}
                                 </span>
-                                <span className="px-2.5 py-0.5 rounded-md bg-secondary/15 text-secondary text-[11px] font-mono font-bold">
+                                <span className="px-2 py-0.5 rounded-md bg-secondary/15 text-secondary text-[10px] sm:text-[11px] font-mono font-bold shrink-0">
                                   Active Route
                                 </span>
                               </div>
-                              <p className="text-xs text-on-surface-variant">
+                              <p className="text-xs text-on-surface-variant truncate">
                                 Corridor: {trip.destination}
                               </p>
-                              <div className="flex items-center gap-3 text-xs text-on-surface-variant pt-1 font-mono">
+                              <div className="flex items-center gap-2.5 sm:gap-3 text-xs text-on-surface-variant pt-0.5 font-mono flex-wrap">
                                 <span className="flex items-center gap-1">
                                   <span className="material-symbols-outlined text-xs">calendar_today</span> {trip.duration_days} Days
                                 </span>
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-xs">altitude</span> Peak: {trip.peak_altitude}
+                                  <span className="material-symbols-outlined text-xs">terrain</span> Peak: {trip.peak_altitude}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                          <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-outline-variant/30 shrink-0">
                             <Link
                               href={`/trips/${trip.id}`}
-                              className="px-3.5 py-2 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors font-semibold text-xs shadow-xs"
+                              className="flex-1 sm:flex-initial text-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors font-semibold text-xs shadow-xs"
                             >
                               Inspect Trip
                             </Link>
                             <button
                               onClick={() => handleDeleteTrip(trip.id)}
-                              className="w-9 h-9 rounded-xl bg-surface-container-lowest text-red-500 hover:bg-red-50 flex items-center justify-center shadow-xs cursor-pointer border border-outline-variant/60"
+                              className="w-9 h-9 rounded-xl bg-surface-container-lowest text-red-500 hover:bg-red-50 flex items-center justify-center shadow-xs cursor-pointer border border-outline-variant/60 shrink-0"
                               title="Delete Trip"
                               type="button"
                             >
@@ -877,7 +896,7 @@ export default function UserProfilePage() {
                       ))
                     ) : (
                       /* Clean Empty State for New Accounts */
-                      <div className="bg-surface-container-low rounded-2xl p-8 flex flex-col items-center justify-center text-center border border-dashed border-outline-variant">
+                      <div className="bg-surface-container-low rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center border border-dashed border-outline-variant">
                         <div className="w-14 h-14 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center mb-3">
                           <span className="material-symbols-outlined text-3xl">route</span>
                         </div>
@@ -885,17 +904,17 @@ export default function UserProfilePage() {
                         <p className="text-xs text-on-surface-variant max-w-sm mt-1 mb-5">
                           Synthesize custom AI itineraries across Pakistan's breathtaking alpine corridors, historical Silk Road trails, and coastal highways.
                         </p>
-                        <div className="flex flex-wrap items-center justify-center gap-3">
+                        <div className="flex flex-wrap items-center justify-center gap-3 w-full sm:w-auto">
                           <Link
                             href="/planner"
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold shadow-xs transition-all"
+                            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold shadow-xs transition-all"
                           >
-                            <span>✨</span>
+                            <span className="material-symbols-outlined text-sm">auto_awesome</span>
                             <span>Synthesize New Itinerary</span>
                           </Link>
                           <Link
                             href="/places"
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/60 transition-all"
+                            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/60 transition-all"
                           >
                             <span className="material-symbols-outlined text-sm">explore</span>
                             <span>Explore Destinations</span>
@@ -907,10 +926,10 @@ export default function UserProfilePage() {
                 </div>
 
                 {/* Places Registry & Spatial Bookmarks Module */}
-                <div className="bg-surface-container-lowest rounded-3xl p-6 sm:p-8 shadow-xs border border-outline-variant/60 flex flex-col gap-6" id="places-bookmarks-hub">
+                <div className="bg-surface-container-lowest rounded-3xl p-5 sm:p-8 shadow-xs border border-outline-variant/60 flex flex-col gap-6" id="places-bookmarks-hub">
                   {/* Module Header & Sub-tab Controls */}
                   <div className="flex flex-col gap-4 border-b pb-5 border-outline-variant/40">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">
@@ -925,16 +944,16 @@ export default function UserProfilePage() {
                       </div>
 
                       {/* Spatial Overview & Map Jump */}
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5 sm:gap-3">
                         <Link
-                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-semibold text-xs border border-outline-variant/60"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-semibold text-xs border border-outline-variant/60"
                           href="/explore#map"
                         >
                           <span className="material-symbols-outlined text-sm text-secondary">map</span>
                           <span>Atlas View</span>
                         </Link>
                         <Link
-                          className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors font-semibold text-xs shadow-xs"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors font-semibold text-xs shadow-xs"
                           href="/places"
                         >
                           <span className="material-symbols-outlined text-sm">add_location_alt</span>
@@ -945,10 +964,10 @@ export default function UserProfilePage() {
 
                     {/* Primary Registry Sub-tabs */}
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                      <div className="inline-flex p-1 bg-surface-container rounded-2xl gap-1 border border-outline-variant/60">
+                      <div className="w-full sm:w-auto inline-flex p-1 bg-surface-container rounded-2xl gap-1 border border-outline-variant/60">
                         <button
                           onClick={() => setRegistryTab("saved")}
-                          className={`px-4 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+                          className={`flex-1 sm:flex-initial justify-center px-3 sm:px-4 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                             registryTab === "saved"
                               ? "bg-surface-container-lowest text-on-surface shadow-xs font-bold"
                               : "text-on-surface-variant hover:text-on-surface"
@@ -963,7 +982,7 @@ export default function UserProfilePage() {
                         </button>
                         <button
                           onClick={() => setRegistryTab("visited")}
-                          className={`px-4 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+                          className={`flex-1 sm:flex-initial justify-center px-3 sm:px-4 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                             registryTab === "visited"
                               ? "bg-surface-container-lowest text-on-surface shadow-xs font-bold"
                               : "text-on-surface-variant hover:text-on-surface"
@@ -981,7 +1000,7 @@ export default function UserProfilePage() {
 
                     {/* Filter Chips Pill Bar (Only if items exist) */}
                     {placesList.length > 0 && (
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1">
                         {[
                           { id: "all", label: `All Types (${filteredPlaces.length})` },
                           { id: "alpine", label: "Alpine Passes & Peaks", icon: "filter_hdr" },
@@ -1013,30 +1032,30 @@ export default function UserProfilePage() {
 
                   {/* Grid of Saved / Visited Place Cards OR Clean Empty State */}
                   {filteredPlaces.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                       {filteredPlaces.map((card) => (
                         <div
                           key={card.id}
                           className="bg-surface-container-low rounded-2xl overflow-hidden hover:bg-surface-container transition-all group flex flex-col justify-between shadow-xs border border-outline-variant/40"
                         >
-                          <div className="relative h-44 overflow-hidden bg-surface-container-high">
+                          <div className="relative h-40 sm:h-44 overflow-hidden bg-surface-container-high">
                             <img
                               alt={card.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               src={card.imgUrl}
                             />
-                            <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                              <span className="px-2.5 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-secondary text-[11px] font-mono font-bold flex items-center gap-1 shadow-xs">
+                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap max-w-[80%]">
+                              <span className="px-2.5 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-secondary text-[10px] sm:text-[11px] font-mono font-bold flex items-center gap-1 shadow-xs">
                                 <span className="material-symbols-outlined text-xs text-secondary">
                                   {card.status === "saved" ? "bookmark" : "verified"}
                                 </span>{" "}
                                 {card.statusText}
                               </span>
-                              <span className="px-2.5 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface text-[11px] font-mono shadow-xs">
+                              <span className="px-2.5 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface text-[10px] sm:text-[11px] font-mono shadow-xs">
                                 {card.elevation}
                               </span>
                             </div>
-                            <div className="absolute top-3 right-3">
+                            <div className="absolute top-2.5 right-2.5">
                               <button
                                 onClick={() => handleToggleBookmark(card.id, card.status)}
                                 className="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-center text-secondary shadow-xs hover:scale-110 transition-transform cursor-pointer"
@@ -1048,22 +1067,22 @@ export default function UserProfilePage() {
                                 </span>
                               </button>
                             </div>
-                            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white px-2 py-1 rounded-xl bg-black/60 backdrop-blur-md font-mono">
+                            <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-[10px] sm:text-[11px] text-white px-2 py-1 rounded-xl bg-black/60 backdrop-blur-md font-mono">
                               <span className="flex items-center gap-1">
                                 <span className="material-symbols-outlined text-xs text-emerald-400">check_circle</span> Verified
                               </span>
-                              <span>{card.coordinates}</span>
+                              <span className="truncate">{card.coordinates}</span>
                             </div>
                           </div>
 
                           <div className="p-4 flex flex-col gap-2 flex-1 justify-between">
                             <div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-mono uppercase tracking-wider text-secondary font-bold">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-mono uppercase tracking-wider text-secondary font-bold truncate">
                                   {card.subLocation}
                                 </span>
                                 {card.priority && (
-                                  <span className="text-[11px] text-on-surface-variant font-medium">
+                                  <span className="text-[11px] text-on-surface-variant font-medium shrink-0">
                                     {card.priority}
                                   </span>
                                 )}
@@ -1078,7 +1097,7 @@ export default function UserProfilePage() {
 
                             <div className="pt-3 border-t border-outline-variant/40 flex items-center justify-between gap-2 mt-2">
                               <Link
-                                className="px-3.5 py-1.5 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors font-semibold text-xs flex items-center gap-1 shadow-xs"
+                                className="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl bg-primary text-white hover:bg-neutral-800 transition-colors font-semibold text-xs flex items-center justify-center gap-1 shadow-xs"
                                 href={card.plannerUrl}
                               >
                                 <span className="material-symbols-outlined text-xs">assistant_navigation</span> Plan Route
@@ -1099,7 +1118,7 @@ export default function UserProfilePage() {
                     </div>
                   ) : (
                     /* Clean Empty State for Bookmarks */
-                    <div className="bg-surface-container-low rounded-2xl p-8 flex flex-col items-center justify-center text-center border border-dashed border-outline-variant">
+                    <div className="bg-surface-container-low rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center border border-dashed border-outline-variant">
                       <div className="w-14 h-14 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center mb-3">
                         <span className="material-symbols-outlined text-3xl">
                           {registryTab === "saved" ? "bookmark_border" : "verified"}
@@ -1113,17 +1132,17 @@ export default function UserProfilePage() {
                           ? "Discover Pakistan's 140+ alpine passes, historic forts, and turquoise lakes to bookmark your dream travel spots."
                           : "Waypoints you visit during your trips will appear here as field-verified travel logs."}
                       </p>
-                      <div className="flex flex-wrap items-center justify-center gap-3">
+                      <div className="flex flex-wrap items-center justify-center gap-3 w-full sm:w-auto">
                         <Link
                           href="/places"
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold shadow-xs transition-all"
+                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold shadow-xs transition-all"
                         >
                           <span className="material-symbols-outlined text-sm">explore</span>
                           <span>Explore 140+ Destinations</span>
                         </Link>
                         <Link
                           href="/explore#map"
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/60 transition-all"
+                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/60 transition-all"
                         >
                           <span className="material-symbols-outlined text-sm">map</span>
                           <span>Open Atlas View</span>
@@ -1135,10 +1154,10 @@ export default function UserProfilePage() {
               </div>
 
               {/* RIGHT COLUMN: Admin Quick Access & Hardware Security (4 Cols) */}
-              <div className="lg:col-span-4 flex flex-col gap-6">
+              <div className="lg:col-span-4 flex flex-col gap-6 w-full">
                 {/* Admin Studio Quick Card - Visible only to admins */}
                 {isAdmin && (
-                  <div className="bg-slate-950 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col gap-4 relative overflow-hidden">
+                  <div className="bg-slate-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-slate-800 flex flex-col gap-4 relative overflow-hidden">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
                         Destination Studio
@@ -1174,7 +1193,7 @@ export default function UserProfilePage() {
                 )}
 
                 {/* Quick Bookmarks & Offline Sync Card */}
-                <div className="bg-surface-container-lowest rounded-3xl p-6 shadow-xs border border-outline-variant/60 flex flex-col gap-4">
+                <div className="bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-xs border border-outline-variant/60 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">
                       Spatial Bookmarks
@@ -1209,7 +1228,7 @@ export default function UserProfilePage() {
                 </div>
 
                 {/* Account Security Card */}
-                <div className="bg-surface-container-lowest rounded-3xl p-6 shadow-xs border border-outline-variant/60 flex flex-col gap-4">
+                <div className="bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-xs border border-outline-variant/60 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">
                       Security &amp; Session
@@ -1256,11 +1275,11 @@ export default function UserProfilePage() {
       {/* Edit Profile Modal Dialog */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-surface-container-lowest rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-6 relative border border-outline-variant/60">
+          <div className="bg-surface-container-lowest rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-8 shadow-2xl space-y-5 sm:space-y-6 relative border border-outline-variant/60">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-secondary">tune</span>
-                <h3 className="font-display font-bold text-xl text-on-surface">
+                <h3 className="font-display font-bold text-lg sm:text-xl text-on-surface">
                   Edit Profile &amp; Travel DNA
                 </h3>
               </div>
@@ -1300,7 +1319,7 @@ export default function UserProfilePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-on-surface uppercase tracking-wider">
                     Budget Tier
