@@ -104,12 +104,21 @@ export default function PlaceDetailPage() {
   const router = useRouter();
   const placeId = params?.id as string;
 
-  const [place, setPlace] = useState<PlaceDetail | null>(null);
-  const [city, setCity] = useState<City | null>(null);
+  // Instant synchronous state initialization from cache if available
+  const initialCachedPlace = placeId ? placesApi.getCachedPlace(placeId) : null;
+  const initialCachedCities = placesApi.getCachedCities() ?? [];
+
+  const [place, setPlace] = useState<PlaceDetail | null>(initialCachedPlace);
+  const [city, setCity] = useState<City | null>(() => {
+    if (initialCachedPlace?.city_id && initialCachedCities.length > 0) {
+      return initialCachedCities.find((c: City) => c.id === initialCachedPlace.city_id) ?? null;
+    }
+    return null;
+  });
   const [siblings, setSiblings] = useState<PlaceSummary[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [weatherData, setWeatherData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialCachedPlace);
   const [loadError, setLoadError] = useState(false);
 
   const [cohortKey, setCohortKey] = useState<CohortKey>("duo");
@@ -129,15 +138,28 @@ export default function PlaceDetailPage() {
     let active = true;
     async function load() {
       if (!placeId) return;
+
+      // Check if we already have the place in cache
+      const cached = placesApi.getCachedPlace(placeId);
+      if (cached && active) {
+        setPlace(cached);
+        setLoading(false);
+      }
+
       try {
+        // Fetch place details and cities in parallel
         const [placeRes, citiesRes] = await Promise.all([
           placesApi.getById(placeId),
           placesApi.getCities(),
         ]);
         if (!active) return;
         setPlace(placeRes);
-        setCity(citiesRes.find((c: City) => c.id === placeRes.city_id) ?? null);
+        setLoading(false);
 
+        const matchedCity = citiesRes.find((c: City) => c.id === placeRes.city_id) ?? null;
+        setCity(matchedCity);
+
+        // Fetch secondary non-blocking telemetry concurrently
         if (placeRes.city_id) {
           api.get(`/weather/${placeRes.city_id}`)
             .then((res) => { if (active && res.data) setWeatherData(res.data); })
@@ -146,26 +168,34 @@ export default function PlaceDetailPage() {
                 .then((res) => { if (active && res.data) setWeatherData(res.data); })
                 .catch(() => {});
             });
-        }
 
-        const [tripList, siblingRes] = await Promise.all([
-          tripsApi.list().catch(() => [] as Trip[]),
           placesApi
             .list({ city_id: placeRes.city_id })
-            .catch(() => ({ items: [] as PlaceSummary[] })),
-        ]);
-        if (!active) return;
-        setSiblings(
-          (siblingRes.items ?? []).filter((p: PlaceSummary) => p.id !== placeId).slice(0, 5)
-        );
-        setTrips(tripList);
+            .then((res) => {
+              if (active && res?.items) {
+                setSiblings(res.items.filter((p: PlaceSummary) => p.id !== placeId).slice(0, 5));
+              }
+            })
+            .catch(() => {});
+        }
+
+        tripsApi
+          .list()
+          .then((tripList) => {
+            if (active && Array.isArray(tripList)) {
+              setTrips(tripList);
+            }
+          })
+          .catch(() => {});
+
         api
           .post("/interactions", { place_id: placeId, interaction_type: "view" })
           .catch(() => {});
       } catch {
-        if (active) setLoadError(true);
-      } finally {
-        if (active) setLoading(false);
+        if (active && !place) {
+          setLoadError(true);
+          setLoading(false);
+        }
       }
     }
     load();

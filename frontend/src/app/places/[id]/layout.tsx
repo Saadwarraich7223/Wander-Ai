@@ -1,6 +1,9 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import StructuredData from "@/components/StructuredData";
 import { SITE_URL, API_BASE_URL } from "@/lib/siteConfig";
+
+export const revalidate = 3600;
 
 const FALLBACK_PLACES: Record<string, any> = {
   "hunza-express": {
@@ -45,10 +48,11 @@ const FALLBACK_PLACES: Record<string, any> = {
   },
 };
 
-async function fetchPlaceData(id: string) {
+const fetchPlaceData = cache(async (id: string) => {
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/places/${id}`, {
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(1500),
     });
     if (res.ok) {
       return await res.json();
@@ -65,7 +69,7 @@ async function fetchPlaceData(id: string) {
     latitude: 33.6844,
     longitude: 73.0479,
   };
-}
+});
 
 export async function generateMetadata({
   params,

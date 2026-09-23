@@ -155,8 +155,11 @@ function getPaginationRange(current: number, total: number): (number | "...")[] 
 }
 
 export default function PlacesPage() {
-  const [cities, setCities] = useState<City[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const initialCities = placesApi.getCachedCities() ?? [];
+  const initialCategories = placesApi.getCachedCategories() ?? [];
+
+  const [cities, setCities] = useState<City[]>(initialCities);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [places, setPlaces] = useState<PlaceSummary[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,14 +209,17 @@ export default function PlacesPage() {
   useEffect(() => {
     let active = true;
     async function load() {
-      setLoading(true);
+      // Only show full-screen skeleton if we have no places in memory
+      if (places.length === 0) {
+        setLoading(true);
+      }
       setLoadError(false);
       try {
         const [citiesRes, catRes, placesRes, tripRes] = await Promise.allSettled([
-          placesApi.getCities(),
-          placesApi.getCategories(),
-          placesApi.list({ limit: 300 }),
-          tripsApi.list(),
+          placesApi.getCities(reloadKey > 0),
+          placesApi.getCategories(reloadKey > 0),
+          placesApi.list({ limit: 300 }, reloadKey > 0),
+          tripsApi.list(reloadKey > 0),
         ]);
         if (!active) return;
         if (citiesRes.status === "fulfilled" && Array.isArray(citiesRes.value)) {
@@ -224,14 +230,14 @@ export default function PlacesPage() {
         }
         if (placesRes.status === "fulfilled" && placesRes.value?.items) {
           setPlaces(placesRes.value.items);
-        } else {
+        } else if (places.length === 0) {
           setLoadError(true);
         }
         if (tripRes.status === "fulfilled" && Array.isArray(tripRes.value)) {
           setTrips(tripRes.value);
         }
       } catch {
-        if (active) setLoadError(true);
+        if (active && places.length === 0) setLoadError(true);
       } finally {
         if (active) setLoading(false);
       }

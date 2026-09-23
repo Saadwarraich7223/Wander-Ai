@@ -108,17 +108,11 @@ async def list_places(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """List places with filtering and pagination."""
-    query = (
-        select(Place)
-        .options(
-            selectinload(Place.category),
-            selectinload(Place.images),
-        )
-    )
+    filters = []
 
     if params.q:
         pattern = f"%{params.q}%"
-        query = query.filter(
+        filters.append(
             or_(
                 Place.name.ilike(pattern),
                 Place.description.ilike(pattern),
@@ -126,24 +120,37 @@ async def list_places(
             )
         )
     if params.city_id:
-        query = query.filter(Place.city_id == params.city_id)
+        filters.append(Place.city_id == params.city_id)
     if params.category_id:
-        query = query.filter(Place.category_id == params.category_id)
+        filters.append(Place.category_id == params.category_id)
     if params.indoor_outdoor:
-        query = query.filter(Place.indoor_outdoor == params.indoor_outdoor)
+        filters.append(Place.indoor_outdoor == params.indoor_outdoor)
     if params.family_suitable is not None:
-        query = query.filter(Place.family_suitable == params.family_suitable)
+        filters.append(Place.family_suitable == params.family_suitable)
     if params.activity_level:
-        query = query.filter(Place.activity_level == params.activity_level)
+        filters.append(Place.activity_level == params.activity_level)
     if params.cost_min is not None:
-        query = query.filter(Place.estimated_cost_min >= params.cost_min)
+        filters.append(Place.estimated_cost_min >= params.cost_min)
     if params.cost_max is not None:
-        query = query.filter(Place.estimated_cost_max <= params.cost_max)
+        filters.append(Place.estimated_cost_max <= params.cost_max)
 
-    # Count total
-    count_query = select(func.count()).select_from(query.subquery())
+    # Count total directly without subquery overhead
+    count_query = select(func.count(Place.id))
+    if filters:
+        count_query = count_query.filter(*filters)
     total_res = await db.execute(count_query)
     total = total_res.scalar_one()
+
+    # Query items with eager loading
+    query = (
+        select(Place)
+        .options(
+            selectinload(Place.category),
+            selectinload(Place.images),
+        )
+    )
+    if filters:
+        query = query.filter(*filters)
 
     # Paginate and order by popularity
     offset = (params.page - 1) * params.limit

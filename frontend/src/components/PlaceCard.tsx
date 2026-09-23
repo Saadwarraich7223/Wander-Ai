@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, placesApi } from "@/lib/api";
 import { PlaceSummary } from "@/types";
 
 interface PlaceCardProps {
@@ -92,10 +92,17 @@ function CompactCard({
   const detailHref = `/places/${place.id}`;
   const isDistrict = isDistrictType(cityName);
 
+  const handleWarmCache = () => {
+    placesApi.prefetchPlace(place.id, place);
+  };
+
   return (
-    <article className="group rounded-2xl bg-surface-container-lowest border border-outline-variant/60 shadow-subtle hover:shadow-elevated transition-all overflow-hidden flex flex-col justify-between h-full">
+    <article
+      onMouseEnter={handleWarmCache}
+      className="group rounded-2xl bg-surface-container-lowest border border-outline-variant/60 shadow-subtle hover:shadow-elevated transition-all overflow-hidden flex flex-col justify-between h-full"
+    >
       <div className={`relative overflow-hidden bg-surface-container ${imageClassName ?? "aspect-[16/10]"}`}>
-        <Link href={detailHref} className="absolute inset-0" aria-label={place.name}>
+        <Link href={detailHref} prefetch={true} onMouseEnter={handleWarmCache} className="absolute inset-0" aria-label={place.name}>
           <PlaceVisual place={place} cityName={cityName} className="group-hover:scale-105 transition-transform duration-500" />
         </Link>
         {place.is_unesco_heritage && (
@@ -196,6 +203,8 @@ function CompactCard({
             )}
             <Link
               href={detailHref}
+              prefetch={true}
+              onMouseEnter={handleWarmCache}
               className="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all cursor-pointer"
             >
               Explore
@@ -222,9 +231,16 @@ function CoverCard({
   const match = matchPercent(place);
   const detailHref = `/places/${place.id}`;
 
+  const handleWarmCache = () => {
+    placesApi.prefetchPlace(place.id, place);
+  };
+
   return (
-    <article className="group relative h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl border border-outline-variant/60 shadow-subtle hover:shadow-elevated transition-all">
-      <Link href={detailHref} className="absolute inset-0" aria-label={place.name}>
+    <article
+      onMouseEnter={handleWarmCache}
+      className="group relative h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl border border-outline-variant/60 shadow-subtle hover:shadow-elevated transition-all"
+    >
+      <Link href={detailHref} prefetch={true} onMouseEnter={handleWarmCache} className="absolute inset-0" aria-label={place.name}>
         {place.primary_image?.url ? (
           <img
             src={place.primary_image.url}
@@ -316,10 +332,17 @@ function FeaturedCard({
   const match = matchPercent(place);
   const detailHref = `/places/${place.id}`;
 
+  const handleWarmCache = () => {
+    placesApi.prefetchPlace(place.id, place);
+  };
+
   return (
-    <article className="rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated bg-surface-container-lowest flex flex-col group transition-all duration-300 h-full">
+    <article
+      onMouseEnter={handleWarmCache}
+      className="rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated bg-surface-container-lowest flex flex-col group transition-all duration-300 h-full"
+    >
       <div className={`relative overflow-hidden bg-surface-container ${imageClassName ?? "aspect-[16/9] sm:aspect-[21/10]"}`}>
-        <Link href={detailHref} className="absolute inset-0" aria-label={place.name}>
+        <Link href={detailHref} prefetch={true} onMouseEnter={handleWarmCache} className="absolute inset-0" aria-label={place.name}>
           <PlaceVisual place={place} cityName={cityName} className="group-hover:scale-105 transition-transform duration-700" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
           <div className="absolute top-4 left-4 flex flex-wrap gap-2">
@@ -402,6 +425,8 @@ function FeaturedCard({
             </button>
             <Link
               href={detailHref}
+              prefetch={true}
+              onMouseEnter={handleWarmCache}
               className="px-4 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs sm:text-sm font-semibold transition-all shadow-sm hover:shadow-glow hover:-translate-y-0.5 flex items-center gap-1.5"
             >
               <span>Inspect Dossier</span>

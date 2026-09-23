@@ -58,68 +58,203 @@ api.interceptors.response.use(
   }
 );
 
+// --- High-Performance In-Memory Cache & In-Flight Request Deduplication ---
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+}
+
+const memoryCache = new Map<string, CacheEntry<any>>();
+const inFlightRequests = new Map<string, Promise<any>>();
+
+function getFromCache<T>(key: string): T | null {
+  const entry = memoryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) {
+    memoryCache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setInCache<T>(key: string, data: T, ttlMs: number): void {
+  memoryCache.set(key, { data, expiry: Date.now() + ttlMs });
+}
+
+function invalidateCache(keyPrefix: string): void {
+  for (const key of memoryCache.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      memoryCache.delete(key);
+    }
+  }
+}
+
+async function cachedFetch<T>(
+  cacheKey: string,
+  ttlMs: number,
+  fetcher: () => Promise<T>,
+  bypassCache = false
+): Promise<T> {
+  if (!bypassCache) {
+    const cached = getFromCache<T>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
+  const existingPromise = inFlightRequests.get(cacheKey);
+  if (existingPromise) {
+    return existingPromise as Promise<T>;
+  }
+
+  const promise = fetcher()
+    .then((result) => {
+      setInCache(cacheKey, result, ttlMs);
+      inFlightRequests.delete(cacheKey);
+      return result;
+    })
+    .catch((err) => {
+      inFlightRequests.delete(cacheKey);
+      throw err;
+    });
+
+  inFlightRequests.set(cacheKey, promise);
+  return promise;
+}
+
 export const tripsApi = {
   create: async (data: any) => {
+    invalidateCache("trips");
     const res = await api.post("/trips", data);
     return res.data;
   },
-  list: async () => {
-    const res = await api.get("/trips");
-    return res.data;
+  list: async (forceRefresh = false) => {
+    return cachedFetch("trips:list", 30 * 1000, async () => {
+      const res = await api.get("/trips");
+      return res.data;
+    }, forceRefresh);
   },
-  getById: async (id: string) => {
-    const res = await api.get(`/trips/${id}`);
-    return res.data;
+  getById: async (id: string, forceRefresh = false) => {
+    return cachedFetch(`trips:${id}`, 30 * 1000, async () => {
+      const res = await api.get(`/trips/${id}`);
+      return res.data;
+    }, forceRefresh);
   },
   remove: async (id: string) => {
+    invalidateCache("trips");
     await api.delete(`/trips/${id}`);
   },
   reoptimize: async (id: string, data: any) => {
+    invalidateCache("trips");
     const res = await api.post(`/trips/${id}/reoptimize`, data);
     return res.data;
   },
   addStop: async (tripId: string, data: { place_id: string; preferred_day_number?: number }) => {
+    invalidateCache("trips");
     const res = await api.post(`/trips/${tripId}/stops`, data);
     return res.data;
   },
   removeStop: async (tripId: string, itemId: string) => {
+    invalidateCache("trips");
     const res = await api.delete(`/trips/${tripId}/stops/${itemId}`);
     return res.data;
   },
   updateStatus: async (id: string, status: "planning" | "active" | "completed" | "cancelled") => {
+    invalidateCache("trips");
     const res = await api.patch(`/trips/${id}/status`, { status });
     return res.data;
   },
   toggleCheckIn: async (tripId: string, itemId: string, isVisited: boolean = true) => {
+    invalidateCache("trips");
     const res = await api.post(`/trips/${tripId}/checkin`, { item_id: itemId, is_visited: isVisited });
     return res.data;
   },
   logExpense: async (tripId: string, expense: { category: string; amount: number; notes?: string; day_number?: number }) => {
+    invalidateCache("trips");
     const res = await api.post(`/trips/${tripId}/expenses`, expense);
     return res.data;
   },
   deleteExpense: async (tripId: string, expenseId: string) => {
+    invalidateCache("trips");
     const res = await api.delete(`/trips/${tripId}/expenses/${expenseId}`);
     return res.data;
   },
+  invalidateCache: () => invalidateCache("trips"),
 };
 
 export const placesApi = {
-  list: async (params?: Record<string, any>) => {
-    const res = await api.get("/places", { params });
-    return res.data;
+  list: async (params?: Record<string, any>, forceRefresh = false) => {
+    const key = `places:list:${params ? JSON.stringify(params) : "default"}`;
+    return cachedFetch(key, 2 * 60 * 1000, async () => {
+      const res = await api.get("/places", { params });
+      const data = res.data;
+      if (data?.items && Array.isArray(data.items)) {
+        // Pre-seed individual place cache so any click opens instantaneously
+        for (const item of data.items) {
+          if (item?.id) {
+            setInCache(`places:item:${item.id}`, item, 5 * 60 * 1000);
+            if (item.slug) {
+              setInCache(`places:item:${item.slug}`, item, 5 * 60 * 1000);
+            }
+          }
+        }
+      }
+      return data;
+    }, forceRefresh);
   },
-  getById: async (id: string) => {
-    const res = await api.get(`/places/${id}`);
-    return res.data;
+  getById: async (id: string, forceRefresh = false) => {
+    const key = `places:item:${id}`;
+    return cachedFetch(key, 5 * 60 * 1000, async () => {
+      const res = await api.get(`/places/${id}`);
+      const data = res.data;
+      if (data?.id) {
+        setInCache(`places:item:${data.id}`, data, 5 * 60 * 1000);
+        if (data.slug) {
+          setInCache(`places:item:${data.slug}`, data, 5 * 60 * 1000);
+        }
+      }
+      return data;
+    }, forceRefresh);
   },
-  getCities: async () => {
-    const res = await api.get("/cities");
-    return res.data;
+  getCachedPlace: (id: string) => {
+    return getFromCache<any>(`places:item:${id}`);
   },
-  getCategories: async () => {
-    const res = await api.get("/categories");
-    return res.data;
+  seedPlaceCache: (place: any) => {
+    if (!place) return;
+    if (place.id) {
+      setInCache(`places:item:${place.id}`, place, 5 * 60 * 1000);
+    }
+    if (place.slug) {
+      setInCache(`places:item:${place.slug}`, place, 5 * 60 * 1000);
+    }
+  },
+  prefetchPlace: (id: string, initialData?: any) => {
+    if (initialData) {
+      placesApi.seedPlaceCache(initialData);
+    }
+    placesApi.getById(id).catch(() => {});
+  },
+  getCities: async (forceRefresh = false) => {
+    return cachedFetch("static:cities", 15 * 60 * 1000, async () => {
+      const res = await api.get("/cities");
+      return res.data;
+    }, forceRefresh);
+  },
+  getCachedCities: () => {
+    return getFromCache<any[]>("static:cities");
+  },
+  getCategories: async (forceRefresh = false) => {
+    return cachedFetch("static:categories", 15 * 60 * 1000, async () => {
+      const res = await api.get("/categories");
+      return res.data;
+    }, forceRefresh);
+  },
+  getCachedCategories: () => {
+    return getFromCache<any[]>("static:categories");
+  },
+  invalidateCache: () => {
+    invalidateCache("places");
+    invalidateCache("static");
   },
 };
 
