@@ -153,23 +153,23 @@ export default function EmergencySOSModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-fade-in">
-      <div className="bg-surface-container-lowest rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-outline-variant/60 flex flex-col">
-        {/* Clean, Cohesive Header */}
-        <div className="p-5 sm:p-6 bg-surface-container-low border-b border-outline-variant/40 rounded-t-3xl flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-600 shrink-0">
-              <span className="material-symbols-outlined text-2xl animate-pulse">sos</span>
+      <div className="bg-surface-container-lowest rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-outline-variant/60 flex flex-col">
+        {/* Clean, Fully Responsive Header */}
+        <div className="p-4 sm:p-6 bg-surface-container-low border-b border-outline-variant/40 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-600 shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-xl sm:text-2xl animate-pulse">sos</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1">
                 <span className="text-[10px] font-mono font-extrabold uppercase tracking-wider bg-red-500/15 text-red-800 px-2 py-0.5 rounded-md">
                   Emergency Safety Sentinel
                 </span>
-                <span className="text-xs text-on-surface-variant font-medium">
+                <span className="text-[11px] text-on-surface-variant font-medium truncate max-w-[200px] sm:max-w-none">
                   {activeRegionName}
                 </span>
               </div>
-              <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-on-surface mt-0.5">
+              <h2 className="font-display text-base sm:text-xl font-bold tracking-tight text-on-surface leading-snug">
                 Emergency Helplines &amp; Regional Medical Directory
               </h2>
             </div>
@@ -177,7 +177,7 @@ export default function EmergencySOSModal({
 
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-outline-variant/60"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-outline-variant/60"
             type="button"
             title="Close"
           >
@@ -186,7 +186,7 @@ export default function EmergencySOSModal({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-7 space-y-6 flex-1">
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 flex-1 overflow-y-auto">
           {/* Section 1: 1-Tap National Emergency Helplines */}
           <div>
             <div className="flex items-center justify-between mb-3">

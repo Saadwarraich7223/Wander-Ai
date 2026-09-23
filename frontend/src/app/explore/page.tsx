@@ -7,6 +7,7 @@ import { placesApi, aiApi, interactionsApi, tripsApi, getErrorMessage } from "@/
 import { authStorage } from "@/lib/auth";
 import { City, Category, PlaceSummary, Trip } from "@/types";
 import Navbar from "@/components/Navbar";
+import FairPriceModal from "@/components/FairPriceModal";
 
 interface POI {
   id: string;
@@ -361,6 +362,7 @@ function SmartMapContent() {
   const [selectedPlaceId, setSelectedPlaceId] = useState<string>("badshahi");
   const [guidedWalkActive, setGuidedWalkActive] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [showFairPriceModal, setShowFairPriceModal] = useState(false);
 
   // Mobile Card Auto-Slideout & Route HUD State
   const [isCardCollapsed, setIsCardCollapsed] = useState(false);
@@ -1573,8 +1575,9 @@ function SmartMapContent() {
                 <div ref={mapContainerRef} className="w-full h-full z-10" />
 
                 {/* Map Layer Controls Bar at Top */}
-                <div className="absolute top-2.5 left-2.5 right-2.5 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap sm:flex-nowrap items-center justify-between pointer-events-none gap-2">
-                  <div className="flex items-center p-1 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto overflow-x-auto scrollbar-none max-w-full">
+                <div className="absolute top-2.5 left-2.5 right-2.5 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-row items-center justify-between pointer-events-none gap-2">
+                  {/* Left: Layer Selectors */}
+                  <div className="flex items-center p-1 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto overflow-x-auto scrollbar-none shrink-0 max-w-[62%] sm:max-w-none">
                     {[
                       { id: "topo", icon: "landscape", label: "Topo" },
                       { id: "golden", icon: "wb_twilight", label: `Golden (${region.goldenHour})` },
@@ -1584,7 +1587,7 @@ function SmartMapContent() {
                       <button
                         key={lyr.id}
                         onClick={() => setActiveLayer(lyr.id as any)}
-                        className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                        className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                           activeLayer === lyr.id
                             ? "bg-secondary text-white shadow-xs font-bold"
                             : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
@@ -1592,14 +1595,24 @@ function SmartMapContent() {
                         type="button"
                       >
                         <span className="material-symbols-outlined text-sm sm:text-[15px]">{lyr.icon}</span>
-                        <span>{lyr.label}</span>
+                        <span className="text-[11px] sm:text-xs">{lyr.label}</span>
                       </button>
                     ))}
                   </div>
 
-                  <div className="hidden md:flex items-center gap-2 p-1.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto">
-                    <span className="px-2.5 py-1 bg-surface-container-low rounded-lg text-[11px] font-mono text-on-surface font-semibold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-secondary text-sm">
+                  {/* Right: Fair Tariffs & GPS Coordinates Badge */}
+                  <div className="flex items-center gap-1.5 p-1 bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-md pointer-events-auto shrink-0">
+                    <button
+                      onClick={() => setShowFairPriceModal(true)}
+                      className="px-2.5 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-[11px] font-mono text-emerald-800 font-bold flex items-center gap-1 transition-colors cursor-pointer border border-emerald-500/30 whitespace-nowrap"
+                      type="button"
+                      title="Anti-Gouging Verified Union Tariffs"
+                    >
+                      <span className="material-symbols-outlined text-sm text-emerald-600">price_check</span>
+                      <span>Fair Rates</span>
+                    </button>
+                    <span className="hidden sm:flex px-2 py-1 bg-surface-container-low rounded-lg text-[10px] font-mono text-on-surface font-semibold items-center gap-1 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-secondary text-xs">
                         navigation
                       </span>
                       <span>{region.coordinates}</span>
@@ -1607,8 +1620,8 @@ function SmartMapContent() {
                   </div>
                 </div>
 
-                {/* Floating Map Zoom & GPS Controls */}
-                <div className="absolute top-14 right-2.5 sm:top-20 sm:right-4 z-20 flex flex-col bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-lg p-1">
+                {/* Floating Map Zoom & GPS Controls (Safely offset below top bar) */}
+                <div className="absolute top-16 right-2.5 sm:top-20 sm:right-4 z-20 flex flex-col bg-surface-container-lowest/95 backdrop-blur-md rounded-xl border border-outline-variant shadow-lg p-1">
                   <button
                     onClick={handleZoomIn}
                     className="p-1.5 text-on-surface hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer"
@@ -2220,6 +2233,13 @@ function SmartMapContent() {
           </div>
         </div>
       )}
+
+      {/* Fair Price Benchmark Index Modal */}
+      <FairPriceModal
+        isOpen={showFairPriceModal}
+        onClose={() => setShowFairPriceModal(false)}
+        activeRegionName={region.name}
+      />
 
       {/* ==================== 4. COMPREHENSIVE FOOTER ==================== */}
       <footer className="w-full bg-surface-container-low border-t border-outline-variant/60 pt-12 pb-8">

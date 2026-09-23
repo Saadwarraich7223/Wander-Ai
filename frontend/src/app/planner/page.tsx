@@ -988,10 +988,10 @@ function PlannerContent() {
 
               {/* Mode Selector & Action Blueprint Controls */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <div className="flex items-center bg-surface-container-high/70 p-1 rounded-xl border border-outline-variant">
+                <div className="flex items-center bg-surface-container-high/70 p-1 rounded-xl border border-outline-variant overflow-x-auto scrollbar-none max-w-full">
                   <button
                     onClick={() => setMode("bespoke")}
-                    className={`px-3.5 py-2 rounded-lg font-display text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg font-display text-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                       mode === "bespoke"
                         ? "bg-surface-container-lowest font-bold text-on-surface shadow-xs"
                         : "text-on-surface-variant hover:text-on-surface font-medium"
@@ -1170,7 +1170,7 @@ function PlannerContent() {
                     <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
                       <button
                         onClick={handleSurpriseMe}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-secondary/15 via-secondary-container/40 to-tertiary-container/50 hover:from-secondary/25 text-on-surface border border-secondary/30 font-semibold text-xs transition-all shadow-xs group/btn cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 rounded-xl bg-gradient-to-r from-secondary/15 via-secondary-container/40 to-tertiary-container/50 hover:from-secondary/25 text-on-surface border border-secondary/30 font-semibold text-xs transition-all shadow-xs group/btn cursor-pointer"
                         type="button"
                       >
                         <span className="material-symbols-outlined text-sm text-secondary group-hover/btn:rotate-12 transition-transform">
@@ -1178,14 +1178,14 @@ function PlannerContent() {
                         </span>
                         <span>
                           Surprise Me{" "}
-                          <span className="font-normal text-on-surface-variant">
+                          <span className="font-normal text-on-surface-variant hidden sm:inline">
                             (Curated Valleys)
                           </span>
                         </span>
                       </button>
 
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono text-[11px] text-on-surface-variant">
+                        <span className="font-mono text-[11px] text-on-surface-variant hidden sm:inline">
                           Trending:
                         </span>
                         {["Bahawalpur", "Hasilpur", "Hunza", "Skardu", "Swat", "Gwadar", "Lahore"].map(
@@ -1526,7 +1526,7 @@ function PlannerContent() {
                       <button
                         key={st.id}
                         onClick={() => setTravelStyle(st.id as any)}
-                        className={`p-4 rounded-xl border text-left flex flex-col justify-between h-36 transition-all cursor-pointer group ${
+                        className={`p-3.5 sm:p-4 rounded-xl border text-left flex flex-col justify-between min-h-[8.5rem] transition-all cursor-pointer group ${
                           isActive
                             ? "bg-surface-container-low border-2 border-secondary shadow-xs"
                             : "bg-surface-container-low hover:bg-surface-container border-outline-variant"
@@ -1869,28 +1869,28 @@ function PlannerContent() {
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="relative w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#151515] via-[#1a2d27] to-[#186a57] hover:to-[#135546] text-white transition-all duration-300 flex items-center justify-between shadow-glow-emerald cursor-pointer group hover:shadow-xl hover:scale-[1.008] active:scale-[0.995] disabled:opacity-80"
+                  className="relative w-full py-3.5 sm:py-4 px-4 sm:px-6 rounded-2xl bg-gradient-to-r from-[#151515] via-[#1a2d27] to-[#186a57] hover:to-[#135546] text-white transition-all duration-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-glow-emerald cursor-pointer group hover:shadow-xl hover:scale-[1.008] active:scale-[0.995] disabled:opacity-80"
                   type="button"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-lg group-hover:rotate-12 transition-transform">
+                    <span className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-lg group-hover:rotate-12 transition-transform shrink-0">
                       <span className="material-symbols-outlined text-xl">auto_awesome</span>
                     </span>
-                    <div className="text-left">
-                      <span className="font-display text-base sm:text-lg font-bold tracking-tight block">
+                    <div className="text-left min-w-0">
+                      <span className="font-display text-sm sm:text-lg font-bold tracking-tight block truncate">
                         {isGenerating
                           ? `Solving Constraints via PostGIS Engine...`
                           : "Generate Autonomous Itinerary"}
                       </span>
-                      <span className="text-[11px] text-emerald-200/80 font-mono block">
+                      <span className="text-[10px] sm:text-[11px] text-emerald-200/80 font-mono block">
                         Zero Hallucination · Topographic Route Simulation
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/30 border border-white/10 font-mono text-xs text-white/90">
+                  <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 pt-1 sm:pt-0 border-t sm:border-t-0 border-white/10">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-black/30 border border-white/10 font-mono text-[11px] sm:text-xs text-white/90">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Solve Time: ~1.8s
+                      Solve: ~1.8s
                     </span>
                     <span className="material-symbols-outlined text-xl group-hover:translate-x-1.5 transition-transform">
                       arrow_forward
@@ -2103,7 +2103,7 @@ function PlannerContent() {
                           }`}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 text-[10px] font-mono">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10px] font-mono">
                     <div
                       className={`p-1.5 rounded border flex items-center gap-1 font-semibold ${solverMetrics.budgetColor}`}
                     >

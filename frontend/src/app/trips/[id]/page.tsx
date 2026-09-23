@@ -10,6 +10,19 @@ import ExportDossierModal from "@/components/ExportDossierModal";
 import EmergencySOSModal from "@/components/EmergencySOSModal";
 import TerrainSafetySentinel from "@/components/TerrainSafetySentinel";
 import AltitudeAcclimatizationSentinel from "@/components/AltitudeAcclimatizationSentinel";
+import FairPriceModal from "@/components/FairPriceModal";
+import CorridorIntelModal from "@/components/CorridorIntelModal";
+import CorridorIntelSection from "@/components/CorridorIntelSection";
+import {
+  FieldIntelReport,
+  ROAD_CONDITION_LABELS,
+  FUEL_STATUS_LABELS,
+  ATM_STATUS_LABELS,
+  formatTimeAgo,
+  getStoredReports,
+  getReportsForTrip,
+  saveReport,
+} from "@/lib/corridorIntel";
 import {
   findPakistanLocation,
   calculateRouteMetrics,
@@ -51,10 +64,14 @@ export default function TripDetailPage() {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [checkingInStopId, setCheckingInStopId] = useState<string | null>(null);
 
-  // Expense Logger & Safety states
+  // Expense Logger, Fair Price & Safety states
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSOSModal, setShowSOSModal] = useState(false);
+  const [showFairPriceModal, setShowFairPriceModal] = useState(false);
+  const [showIntelModal, setShowIntelModal] = useState(false);
+  const [reportsVersion, setReportsVersion] = useState(0);
+
   const [tripVehicle, setTripVehicle] = useState<"sedan" | "crossover" | "suv_4x4">("crossover");
   const [expenseCategory, setExpenseCategory] = useState<string>("Dining");
   const [expenseAmount, setExpenseAmount] = useState<number | "">("");
@@ -613,6 +630,37 @@ export default function TripDetailPage() {
   const nextStop = secondUnvisited ? secondUnvisited.item : null;
   const nextStopDayNum = secondUnvisited ? secondUnvisited.dayNum : null;
 
+  // Waypoints list for universal telemetry aggregation
+  const tripWaypoints = useMemo(() => {
+    if (!trip?.active_itinerary?.days) return [];
+    const waypoints: Array<{ id?: string; name?: string; slug?: string }> = [];
+    for (const d of trip.active_itinerary.days) {
+      for (const it of d.items || []) {
+        waypoints.push({
+          id: it.place?.id || (it as any).place_id,
+          name: it.place?.name,
+          slug: it.place?.slug,
+        });
+      }
+    }
+    return waypoints;
+  }, [trip]);
+
+  // Aggregated live crowdsourced reports across the entire expedition and its waypoints
+  const fieldReports = useMemo(() => {
+    return getReportsForTrip({
+      tripId,
+      waypoints: tripWaypoints,
+      cityId: trip?.city_id,
+      corridorName: routeMetrics.corridorName,
+    });
+  }, [tripId, tripWaypoints, trip?.city_id, routeMetrics.corridorName, reportsVersion]);
+
+  const handleAddIntelReport = (newReport: FieldIntelReport) => {
+    saveReport(tripId, newReport);
+    setReportsVersion((v) => v + 1);
+  };
+
   // 5-Pillar Budget Engine
   const budgetBreakdown = useMemo(() => {
     const total = trip?.total_budget || 50000;
@@ -962,6 +1010,16 @@ export default function TripDetailPage() {
                   </button>
 
                   <button
+                    onClick={() => setShowFairPriceModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low text-emerald-800 hover:bg-surface-container text-xs font-semibold transition-colors shadow-sm cursor-pointer border border-outline-variant/60"
+                    type="button"
+                    title="Anti-Gouging Verified Union Tariffs"
+                  >
+                    <span className="material-symbols-outlined text-base text-emerald-600">price_check</span>
+                    <span>Fair Rates</span>
+                  </button>
+
+                  <button
                     onClick={() => setShowSOSModal(true)}
                     className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 text-xs font-bold transition-colors shadow-sm cursor-pointer border border-transparent"
                     type="button"
@@ -1128,6 +1186,54 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
+                {/* Live Corridor Micro-Telemetry Strip */}
+                <div className="py-2.5 px-3.5 mt-3.5 rounded-xl bg-surface-container-low/90 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                  {fieldReports.length > 0 ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-800">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Road: {ROAD_CONDITION_LABELS[fieldReports[0].roadCondition]?.label.split("(")[0]}
+                      </span>
+                      <span className="text-outline hidden sm:inline">•</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono text-on-surface">
+                        <span className="material-symbols-outlined text-xs text-secondary">local_gas_station</span>
+                        Fuel: {FUEL_STATUS_LABELS[fieldReports[0].fuelStatus]?.label.split("(")[0]}
+                      </span>
+                      <span className="text-outline hidden sm:inline">•</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono text-on-surface">
+                        <span className="material-symbols-outlined text-xs text-secondary">payments</span>
+                        ATM: {ATM_STATUS_LABELS[fieldReports[0].atmStatus]?.label.split("(")[0]}
+                      </span>
+                      {fieldReports[0].note && (
+                        <>
+                          <span className="text-outline hidden sm:inline">•</span>
+                          <span className="text-[11px] text-on-surface font-medium italic max-w-[220px] truncate" title={fieldReports[0].note}>
+                            &ldquo;{fieldReports[0].note}&rdquo;
+                          </span>
+                        </>
+                      )}
+                      <span className="text-outline hidden sm:inline">•</span>
+                      <span className="text-[10px] text-on-surface-variant font-mono">
+                        Logged {formatTimeAgo(fieldReports[0].timestamp)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-on-surface-variant text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-outline-variant" />
+                      <span>No crowdsourced field logs reported yet for this route.</span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setShowIntelModal(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-secondary hover:underline cursor-pointer self-start sm:self-auto shrink-0"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-xs">edit_note</span>
+                    <span>{fieldReports.length > 0 ? "Update Road Status" : "+ Report Road / Fuel"}</span>
+                  </button>
+                </div>
+
                 {/* Active Waypoint Card & Next Stop Preview */}
                 {visitedStopsCount === totalStopsCount && totalStopsCount > 0 ? (
                   <div className="pt-4">
@@ -1210,6 +1316,16 @@ export default function TripDetailPage() {
                             <span className="material-symbols-outlined text-base text-secondary">check_circle</span>
                           )}
                           <span>Mark Day {currentDayNum} Stop Visited</span>
+                        </button>
+
+                        <button
+                          onClick={() => setShowIntelModal(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/60 transition shadow-xs cursor-pointer"
+                          type="button"
+                          title="Report live road & fuel status"
+                        >
+                          <span className="material-symbols-outlined text-base text-secondary">campaign</span>
+                          <span>Report Road/Fuel</span>
                         </button>
                       </div>
                     </div>
@@ -2146,6 +2262,16 @@ export default function TripDetailPage() {
                 destinationName={destLoc.name}
                 onOpenSOSModal={() => setShowSOSModal(true)}
               />
+
+              {/* Ground-Truth Corridor Intelligence & Fair Price Section */}
+              <CorridorIntelSection
+                destinationName={destLoc.name}
+                corridorName={routeMetrics.corridorName}
+                passabilityPercent={routeMetrics.roadPassabilityPercent}
+                recentReports={fieldReports}
+                onOpenReportModal={() => setShowIntelModal(true)}
+                onOpenFairPriceModal={() => setShowFairPriceModal(true)}
+              />
             </section>
           </div>
         </div>
@@ -2737,6 +2863,28 @@ export default function TripDetailPage() {
         isOpen={showSOSModal}
         onClose={() => setShowSOSModal(false)}
         activeRegionName={destLoc.name}
+      />
+
+      {/* Fair Price Benchmark Index Modal */}
+      <FairPriceModal
+        isOpen={showFairPriceModal}
+        onClose={() => setShowFairPriceModal(false)}
+        activeRegionName={destLoc.name}
+      />
+
+      {/* 1-Tap Corridor Field Intelligence Modal */}
+      <CorridorIntelModal
+        isOpen={showIntelModal}
+        onClose={() => setShowIntelModal(false)}
+        placeId={currentStop?.place?.id || (currentStop as any)?.place_id}
+        placeSlug={currentStop?.place?.slug}
+        placeName={currentStop?.place?.name || destLoc.name}
+        corridorName={routeMetrics.corridorName}
+        cityId={currentStop?.place?.city_id || trip?.city_id}
+        cityName={destLoc.name}
+        tripId={tripId}
+        verifiedInTrip={true}
+        onSubmitReport={handleAddIntelReport}
       />
 
 
