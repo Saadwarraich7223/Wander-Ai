@@ -284,7 +284,7 @@ export default function OnboardingPage() {
           <div className="flex flex-col items-center justify-center flex-1 max-w-md mx-auto hidden sm:flex">
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-[11px] uppercase tracking-wider text-secondary font-semibold">
-                Calibration Sequence
+                Profile Setup
               </span>
               <span className="text-[11px] text-on-surface-variant font-medium">
                 Step 2 of 3
@@ -294,7 +294,7 @@ export default function OnboardingPage() {
               <div className="h-full w-2/3 bg-secondary rounded-full transition-all duration-500 ease-out" />
             </div>
             <div className="w-full flex justify-between items-center mt-1">
-              <span className="text-[11px] text-on-surface-variant">Algorithmic Calibration</span>
+              <span className="text-[11px] text-on-surface-variant">Personalizing Travel DNA</span>
               <span className="text-[11px] text-on-surface-variant opacity-60">67%</span>
             </div>
           </div>
@@ -325,7 +325,7 @@ export default function OnboardingPage() {
       {/* Main Interactive Stage */}
       <main className="w-full pt-20 sm:pt-24 bg-background min-h-[calc(100vh-5rem)] flex flex-col justify-between">
         <div className="flex flex-col w-full">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-14 py-8 sm:py-10 w-full space-y-8 sm:space-y-10">
+          <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-14 pt-4 sm:pt-6 pb-8 sm:pb-10 w-full space-y-6 sm:space-y-8">
             {/* Top Status & Hero Calibration Banner */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-surface-container-high">
               <div className="space-y-3 max-w-3xl">
@@ -335,11 +335,11 @@ export default function OnboardingPage() {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary" />
                   </span>
                   <span className="text-[11px] uppercase tracking-wider text-secondary font-bold">
-                    Cognitive Engine Initialization · v4.2
+                    Travel Preference Setup
                   </span>
                   <span className="text-outline-variant text-[10px]">/</span>
                   <span className="text-[11px] text-on-surface-variant font-medium">
-                    Model B &amp; Model D Calibration
+                    Tailoring Recommendations
                   </span>
                 </div>
 
@@ -414,7 +414,7 @@ export default function OnboardingPage() {
                         Dimension 01
                       </span>
                       <h2 className="font-display text-lg sm:text-xl font-bold text-on-surface">
-                        Travel Interests &amp; Vector Calibration
+                        Travel Interests &amp; Preferences
                       </h2>
                     </div>
                     <span className="text-[11px] font-semibold text-on-surface-variant bg-surface-container-high px-2.5 py-0.5 rounded-full">

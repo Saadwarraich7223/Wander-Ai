@@ -211,21 +211,22 @@ export default function TripsPage() {
       <Navbar tripsCount={trips.length} />
 
       {/* ==================== MAIN CANVAS ==================== */}
-      <main className="w-full pt-28 pb-16 bg-background min-h-screen">
+      <main className="w-full pt-20 sm:pt-24 pb-12 sm:pb-16 bg-background min-h-screen">
         <div className="flex flex-col w-full">
 
-          {/* SECTION 1: COMMAND HEADER & BREADCRUMB */}
-          <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8  pb-6">
+          {/* SECTION 1: COMMAND HEADER */}
+          <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-6">
             <div className="flex flex-col gap-6">
 
               {/* Title & Primary Control Buttons */}
               <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
                 <div className="max-w-2xl">
                   <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-on-surface tracking-tight leading-tight mb-2">
-                    Expedition Command
+                    Autonomous Itinerary &amp;
+                    <span className="block text-secondary">Expedition Command</span>
                   </h1>
-                  <p className="text-sm text-on-surface-variant leading-relaxed">
-                    Manage, simulate, and reoptimize your algorithmic itineraries across Pakistan. 0% constraint violations, live weather synchronization, and PostGIS corridor telemetry.
+                  <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                    Manage, view, and customize your travel itineraries across Pakistan with live weather updates and real-time road conditions.
                   </p>
                 </div>
 
@@ -286,8 +287,8 @@ export default function TripsPage() {
                     <span className="material-symbols-outlined text-2xl">verified</span>
                   </div>
                   <div>
-                    <div className="font-mono text-[10px] text-secondary font-bold uppercase tracking-wider">Constraint Satisfaction</div>
-                    <div className="font-display text-xl font-bold text-on-surface">0 Violations · Optimal</div>
+                    <div className="font-mono text-[10px] text-secondary font-bold uppercase tracking-wider">Route Optimization</div>
+                    <div className="font-display text-xl font-bold text-on-surface">Verified &amp; Optimal</div>
                   </div>
                 </div>
               </div>
@@ -914,9 +915,9 @@ export default function TripsPage() {
                   <div className="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
                     <span className="material-symbols-outlined text-xl">schema</span>
                   </div>
-                  <h4 className="font-display font-bold text-sm text-on-surface">Spatial Trace &amp; GeoJSON</h4>
+                  <h4 className="font-display font-bold text-sm text-on-surface">GPS Route &amp; GeoJSON</h4>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Export mathematical constraint parameters, PostGIS distance matrices, and raw waypoint vectors for external GIS analysis.
+                    Export route coordinates, waypoint stops, and travel details for external maps and navigation devices.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-outline-variant/30">

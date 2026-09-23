@@ -139,8 +139,9 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 font-medium">
-            ⭐ 4.9/5 Rating
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 font-medium">
+            <span className="material-symbols-outlined text-sm text-amber-300">grade</span>
+            <span>4.9/5 Rating</span>
           </span>
         </div>
       </div>

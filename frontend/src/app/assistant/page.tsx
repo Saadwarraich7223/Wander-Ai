@@ -142,28 +142,20 @@ function AssistantContent() {
           <div className="pt-2 sm:pt-4 pb-6 sm:pb-8 border-b border-outline-variant/60">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 sm:gap-6">
               <div className="max-w-3xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-3 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-mono font-bold tracking-wider uppercase flex items-center gap-1.5 border border-secondary/20">
-                    <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-                    Grounded RAG Engine v4.2
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs font-mono hidden sm:inline-block border border-outline-variant/60">
-                    Tool-Calling Active
-                  </span>
-                </div>
-                <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-on-surface">
-                  AI Travel Intelligence Console
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-on-surface">
+                  Conversational AI Agent &amp;
+                  <span className="block text-secondary">Travel Intelligence Console</span>
                 </h1>
-                <p className="font-sans text-xs sm:text-sm md:text-base text-on-surface-variant mt-2 sm:mt-2.5 leading-relaxed max-w-2xl">
-                  Conversational RAG agent augmented by real-time weather telemetry, PostGIS waypoint meshes, local cost parameters, and multi-day expedition synthesis.
+                <p className="font-sans text-xs sm:text-sm text-on-surface-variant mt-2 leading-relaxed max-w-2xl">
+                  Ask questions about Pakistan destinations, seasonal weather passability, 4x4 mountain routes, local estimated budgets, and tailored multi-day itineraries.
                 </p>
               </div>
 
               {/* Status & Trip Selector Box */}
               <div className="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 bg-surface-container-high/70 p-2.5 sm:p-3 rounded-2xl border border-outline-variant/60">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-lowest text-xs font-mono text-on-surface border border-outline-variant/60">
-                  <span className="material-symbols-outlined text-sm text-secondary">satellite_alt</span>
-                  <span>Sentinel-2 Synced</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-lowest text-xs font-medium text-on-surface border border-outline-variant/60">
+                  <span className="material-symbols-outlined text-sm text-secondary">wb_sunny</span>
+                  <span>PMD Weather Synced</span>
                 </div>
                 {trips.length > 0 && (
                   <div className="flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 rounded-xl border border-outline-variant/60 flex-1 sm:flex-initial">
@@ -296,8 +288,8 @@ function AssistantContent() {
                     <h3 className="font-display font-bold text-sm sm:text-base text-on-surface truncate">
                       Travel Intelligence Assistant
                     </h3>
-                    <p className="text-[11px] sm:text-xs text-on-surface-variant font-mono truncate">
-                      {activeTrip ? `Context: ${activeTrip.title}` : "Grounded RAG Pipeline · Connected to Pakistan GIS"}
+                    <p className="text-[11px] sm:text-xs text-on-surface-variant font-medium truncate">
+                      {activeTrip ? `Active Trip: ${activeTrip.title}` : "Connected to Live Pakistan Travel Intelligence"}
                     </p>
                   </div>
                 </div>
@@ -467,8 +459,8 @@ function AssistantContent() {
                     <div className="flex items-center gap-2.5">
                       <span className="material-symbols-outlined text-base text-secondary">map</span>
                       <div className="flex flex-col">
-                        <span className="font-bold text-on-surface">PostGIS Waypoint Mesh</span>
-                        <span className="text-[11px] text-on-surface-variant">300+ spatial POIs &amp; passes</span>
+                        <span className="font-bold text-on-surface">Pakistan Destinations Directory</span>
+                        <span className="text-[11px] text-on-surface-variant">Verified places, forts &amp; passes</span>
                       </div>
                     </div>
                     <span className="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>

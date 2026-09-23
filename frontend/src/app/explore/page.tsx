@@ -1075,7 +1075,7 @@ function SmartMapContent() {
       />
 
       {/* ==================== 2. MAIN CANVAS ==================== */}
-      <main className="w-full pt-28 pb-16">
+      <main className="w-full pt-20 sm:pt-24 pb-12 sm:pb-16">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-8">
 
           {/* ── TRIP MODE BANNER ── */}
@@ -1193,7 +1193,8 @@ function SmartMapContent() {
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 sm:gap-6">
               <div className="max-w-3xl">
                 <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-on-surface">
-                  WanderAI Smart Map &amp; Spatial Intelligence
+                  Interactive 3D GIS Map &amp;
+                  <span className="block text-secondary">Spatial Intelligence</span>
                 </h1>
                 <p className="font-sans text-xs sm:text-sm text-on-surface-variant mt-2 leading-relaxed max-w-2xl">
                   {activeTripData
@@ -1997,14 +1998,14 @@ function SmartMapContent() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="font-display font-bold text-xl sm:text-2xl text-on-surface">
-                  Geospatial Elevation & Corridor Analytics
+                  Geospatial Elevation &amp; Corridor Insights
                 </h2>
                 <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
-                  Algorithmic spatial modeling powered by PostGIS satellite telemetry and real-time passability gates
+                  Elevation profiles, mountain pass status, and scenic viewpoint telemetry across Pakistan
                 </p>
               </div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-container/60 text-secondary font-mono text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" /> 100% Deterministic GIS
+                <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" /> Live Corridor Clearance
               </span>
             </div>
 

@@ -972,16 +972,17 @@ function PlannerContent() {
       />
 
       {/* ==================== MAIN CANVAS ==================== */}
-      <main className="w-full pt-28 pb-16">
+      <main className="w-full pt-20 sm:pt-24 pb-12 sm:pb-16">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-8">
           {/* HERO HEADER & UTILITY BAR */}
-          <div className="pt-4 pb-8 border-b border-outline-variant/60 mb-8">
+          <div className="pt-2 sm:pt-4 pb-6 border-b border-outline-variant/60 mb-6 sm:mb-8">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div className="max-w-3xl">
-                <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-on-surface">
-                  Design your bespoke expedition with algorithmic precision.
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-on-surface">
+                  Design Bespoke Expeditions with
+                  <span className="block text-secondary">Algorithmic Precision</span>
                 </h1>
-                <p className="font-sans text-sm sm:text-base text-on-surface-variant mt-2.5 leading-relaxed max-w-2xl">
+                <p className="font-sans text-xs sm:text-sm text-on-surface-variant mt-2 leading-relaxed max-w-2xl">
                   Synthesizing topographic elevation, real-time Pakistani road telemetry, curated boutique glamping, and private 4x4 staging into a flawless multi-day itinerary.
                 </p>
               </div>
@@ -1116,10 +1117,10 @@ function PlannerContent() {
                     </span>
                     <div>
                       <h2 className="font-display font-bold text-base sm:text-lg text-on-surface">
-                        Departure Hub & Destination Vector
+                        Departure Point &amp; Destination
                       </h2>
                       <p className="text-xs text-on-surface-variant">
-                        Select any Pakistani city, tehsil, or district hub for live PostGIS route calculations
+                        Select any Pakistani city or district hub to start planning your route
                       </p>
                     </div>
                   </div>
@@ -1572,15 +1573,15 @@ function PlannerContent() {
                     </span>
                     <div>
                       <h2 className="font-display font-bold text-base sm:text-lg text-on-surface">
-                        Logistics & Velocity Calibration
+                        Transportation &amp; Travel Style
                       </h2>
                       <p className="text-xs text-on-surface-variant">
                         Ground vehicle class, hospitality standard, and daily pacing
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs text-secondary font-mono font-semibold">
-                    PostGIS Verified
+                  <span className="text-xs text-secondary font-medium">
+                    Verified Routes
                   </span>
                 </div>
 
@@ -1588,7 +1589,7 @@ function PlannerContent() {
                   {/* Transit Vector Class */}
                   <div>
                     <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-medium mb-2">
-                      Transit Vector Class
+                      Mode of Travel
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {/* Car / 4x4 */}
@@ -1879,18 +1880,18 @@ function PlannerContent() {
                     <div className="text-left min-w-0">
                       <span className="font-display text-sm sm:text-lg font-bold tracking-tight block truncate">
                         {isGenerating
-                          ? `Solving Constraints via PostGIS Engine...`
-                          : "Generate Autonomous Itinerary"}
+                          ? `Synthesizing Custom Travel Itinerary...`
+                          : "Generate Custom Itinerary"}
                       </span>
                       <span className="text-[10px] sm:text-[11px] text-emerald-200/80 font-mono block">
-                        Zero Hallucination · Topographic Route Simulation
+                        Optimized Driving Times &amp; Curated Stops
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 pt-1 sm:pt-0 border-t sm:border-t-0 border-white/10">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-black/30 border border-white/10 font-mono text-[11px] sm:text-xs text-white/90">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Solve: ~1.8s
+                      Ready in seconds
                     </span>
                     <span className="material-symbols-outlined text-xl group-hover:translate-x-1.5 transition-transform">
                       arrow_forward
@@ -1901,15 +1902,15 @@ function PlannerContent() {
                 {/* Trust Signals */}
                 <div className="flex flex-wrap items-center justify-center gap-4 text-on-surface-variant font-mono text-[11px]">
                   <span className="flex items-center gap-1 text-secondary">
-                    <span className="material-symbols-outlined text-xs">verified</span> 100% Deterministic Feasibility
+                    <span className="material-symbols-outlined text-xs">verified</span> Verified Route Feasibility
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs text-secondary">satellite_alt</span> Live PostGIS Satellite Verified
+                    <span className="material-symbols-outlined text-xs text-secondary">satellite_alt</span> Live Weather &amp; Road Telemetry
                   </span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs text-secondary">lock</span> Zero Cancellation Booking Lockers
+                    <span className="material-symbols-outlined text-xs text-secondary">lock</span> Flexible Itinerary Customization
                   </span>
                 </div>
               </div>

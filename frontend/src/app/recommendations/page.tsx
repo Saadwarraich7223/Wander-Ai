@@ -434,16 +434,17 @@ export default function RecommendationsPage() {
       <Navbar user={user} />
 
       {/* Main Content Body */}
-      <main className="w-full pt-20 sm:pt-24 pb-16 relative z-10 flex-1">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-8 space-y-8 sm:space-y-12">
+      <main className="w-full pt-20 sm:pt-24 pb-12 sm:pb-16 relative z-10 flex-1">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-8 space-y-6 sm:space-y-8">
           {/* HERO HEADER & AI MODEL LENS FILTER BAR (Map Page Banner Style) */}
-          <div className="pt-4 pb-8 border-b border-outline-variant/60 mb-8">
+          <div className="pt-2 sm:pt-4 pb-6 border-b border-outline-variant/60 mb-6 sm:mb-8">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div className="max-w-3xl">
-                <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-on-surface">
-                  AI Recommendation &amp; Intelligence Hub
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-on-surface">
+                  AI Recommendations &amp;
+                  <span className="block text-secondary">Spatial Intelligence Hub</span>
                 </h1>
-                <p className="font-sans text-sm sm:text-base text-on-surface-variant mt-2.5 leading-relaxed max-w-2xl">
+                <p className="font-sans text-xs sm:text-sm text-on-surface-variant mt-2 leading-relaxed max-w-2xl">
                   Multi-Model Machine Learning Engine · Autonomous Destination &amp; Experience Synthesis calibrated for elevation, road telemetry, microclimates, and bespoke travel affinities.
                 </p>
               </div>

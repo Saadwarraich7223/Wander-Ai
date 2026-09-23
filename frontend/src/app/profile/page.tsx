@@ -363,8 +363,8 @@ export default function UserProfilePage() {
     return (
       <div className="min-h-screen bg-background font-sans text-on-surface antialiased flex flex-col">
         <Navbar user={user} />
-        <main className="w-full bg-background flex-1 pt-24 pb-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 animate-pulse">
+        <main className="w-full bg-background flex-1 pt-20 sm:pt-24 pb-12 sm:pb-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-pulse">
             <div className="h-48 rounded-3xl bg-surface-container-lowest border border-outline-variant/60 p-8 flex items-center gap-6">
               <div className="w-20 h-20 rounded-full bg-surface-container" />
               <div className="space-y-3 flex-1">

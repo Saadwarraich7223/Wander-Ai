@@ -359,24 +359,8 @@ export default function PlaceDetailPage() {
     <div className="bg-background text-on-surface antialiased min-h-screen flex flex-col font-body-md">
       <Navbar tripsCount={trips.length} />
 
-      <main className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 pt-24 pb-16 space-y-10">
-        <div className="py-6 space-y-6">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant font-medium">
-            <Link href="/explore" className="hover:text-secondary transition-colors">
-              Explore
-            </Link>
-            <span className="material-symbols-outlined text-sm text-outline">
-              chevron_right
-            </span>
-            <span>{regionName}</span>
-            <span className="material-symbols-outlined text-sm text-outline">
-              chevron_right
-            </span>
-            <span className="text-on-surface font-semibold">
-              {place ? place.name : <span className="inline-block w-28 h-3.5 rounded bg-surface-container animate-pulse align-middle" />}
-            </span>
-          </div>
-
+      <main className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 pt-20 sm:pt-24 pb-12 sm:pb-16 space-y-6 sm:space-y-8">
+        <div className="space-y-4">
           <div className="flex flex-wrap gap-2 items-center">
             {place?.is_unesco_heritage && (
               <div className="flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-xs font-bold text-amber-700 dark:text-amber-300">
@@ -417,6 +401,7 @@ export default function PlaceDetailPage() {
               {seasonNote}
             </div>
           </div>
+        </div>
 
           {/* Live Ground-Truth Corridor Telemetry (Minimal & Ultra-Premium, rendered only when real logs exist) */}
           {placeReports.length > 0 && (
@@ -499,7 +484,6 @@ export default function PlaceDetailPage() {
               )}
             </div>
           )}
-        </div>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           <div className="lg:col-span-2 relative rounded-3xl overflow-hidden border border-outline-variant/60 shadow-elevated min-h-[380px] sm:min-h-[440px] bg-surface-container">
@@ -577,11 +561,11 @@ export default function PlaceDetailPage() {
                 {regionName} · {city?.name ?? "Verified Destination"}
               </p>
               <div className="flex flex-wrap items-baseline gap-3">
-                <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
                   {place ? place.name : <span className="inline-block w-64 h-8 rounded-lg bg-white/20 animate-pulse align-middle" />}
                 </h1>
                 {place?.name_ur && (
-                  <span className="text-xl sm:text-2xl text-emerald-300 font-semibold font-serif dir-rtl">
+                  <span className="text-lg sm:text-xl text-emerald-300 font-semibold font-serif dir-rtl">
                     {place.name_ur}
                   </span>
                 )}
@@ -657,7 +641,7 @@ export default function PlaceDetailPage() {
               <p className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">
                 Estimated Cost
               </p>
-              <p className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface">
+              <p className="font-display text-xl sm:text-2xl font-bold tracking-tight text-on-surface">
                 PKR {totalBudget.toLocaleString()}
               </p>
               <p className="text-xs text-on-surface-variant">
@@ -708,7 +692,7 @@ export default function PlaceDetailPage() {
             <StatCard
               icon="verified"
               value={`${connectivity}%`}
-              label="RAG citation confidence"
+              label="Verified Guide Confidence"
             />
           </div>
         </section>
@@ -719,7 +703,7 @@ export default function PlaceDetailPage() {
               <p className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
                 Telemetry
               </p>
-              <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
+              <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-on-surface">
                 Seasonality & Climate Matrix
               </h2>
             </div>
@@ -795,7 +779,7 @@ export default function PlaceDetailPage() {
             <p className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
               Audited Anchors
             </p>
-            <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
+            <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-on-surface">
               Curated Waypoint Dossiers
             </h2>
           </div>
@@ -907,7 +891,7 @@ export default function PlaceDetailPage() {
             <p className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
               Local Texture
             </p>
-            <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight text-on-surface">
+            <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-on-surface">
               Gastronomy, Culture & Lodging
             </h2>
           </div>

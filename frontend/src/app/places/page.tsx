@@ -385,23 +385,23 @@ export default function PlacesPage() {
     <div className="bg-background font-sans text-on-surface antialiased min-h-screen flex flex-col">
       <Navbar tripsCount={trips.length} />
 
-      <main className="w-full bg-background flex-grow pt-10">
+      <main className="w-full bg-background flex-grow pt-20 sm:pt-24 pb-12 sm:pb-16">
         <div className="flex flex-col w-full">
           {/* Hero: Geographic Frontier Command Center */}
-          <section className="w-full bg-surface pt-5 relative overflow-hidden">
+          <section className="w-full bg-surface relative overflow-hidden">
             <div className="absolute -right-32 -top-32 w-[480px] h-[480px] rounded-full bg-secondary-container/20 blur-3xl pointer-events-none" />
             <div className="absolute -left-32 top-24 w-[420px] h-[420px] rounded-full bg-tertiary-fixed/30 blur-3xl pointer-events-none" />
 
-            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-14 sm:pb-16">
-              <div className="flex flex-col items-start gap-4 sm:gap-5 max-w-4xl">
+            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-8 sm:pb-10">
+              <div className="flex flex-col items-start gap-3 sm:gap-4 max-w-4xl">
 
 
-                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl text-on-surface font-extrabold leading-[1.08] tracking-tight">
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-on-surface font-extrabold leading-tight tracking-tight">
                   Explore Pakistan&rsquo;s Epic
                   <span className="block text-secondary">Geographic Frontiers</span>
                 </h1>
 
-                <p className="text-sm sm:text-base lg:text-lg text-on-surface-variant max-w-xl leading-relaxed">
+                <p className="text-xs sm:text-sm text-on-surface-variant max-w-2xl leading-relaxed">
                   Algorithmic seasonal route curation, real-time alpine pass gates, and deep
                   heritage vectors synthesized across the Karakoram, Western Himalayas, Hindu
                   Kush, and Makran Coast.
@@ -410,7 +410,7 @@ export default function PlacesPage() {
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/50 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
                     <span className="inline-block w-2 h-2 rounded-full bg-secondary animate-pulse" />
-                    PostGIS Engine v3.4 Active
+                    Live Map Data Active
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/50 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
                     {cities.length > 0 ? `${cities.length} Regional Corridors` : "7 Major Corridors"}
@@ -578,7 +578,7 @@ export default function PlacesPage() {
               <div className="mt-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-outline-variant/60">
                   <div>
-                    <h2 className="font-display text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                    <h2 className="font-display text-lg sm:text-xl font-bold text-on-surface tracking-tight">
                       Verified Regional Catalog
                     </h2>
                     <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
@@ -714,15 +714,15 @@ export default function PlacesPage() {
           ) : (
             <>
               {/* Live Passability & Atmospheric Telemetry Strip */}
-              <section className="w-full bg-surface-container-low border-y border-outline-variant/40 py-14 sm:py-20">
+              <section className="w-full bg-surface-container-low border-y border-outline-variant/40 py-8 sm:py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 sm:mb-8">
                     <div className="max-w-2xl">
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary mb-2">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">
                         <span className="material-symbols-outlined text-[16px]">traffic</span>
                         Real-Time Alpine Telmetry
                       </div>
-                      <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
+                      <h2 className="font-display text-lg sm:text-xl font-bold text-on-surface tracking-tight">
                         Active Mountain Passability &amp; Corridor Clearance
                       </h2>
                       <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] font-medium text-on-surface-variant">
@@ -757,15 +757,15 @@ export default function PlacesPage() {
               </section>
 
               {/* Top Seasonal Picks — 1+2 Bento */}
-              <section className="w-full bg-surface py-14 sm:py-20">
+              <section className="w-full bg-surface py-8 sm:py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="flex items-end justify-between gap-4 mb-8">
+                  <div className="flex items-end justify-between gap-4 mb-6 sm:mb-8">
                     <div className="max-w-xl">
                       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">
                         <span className="material-symbols-outlined text-[15px]">calendar_month</span>
                         Top Seasonal Picks
                       </div>
-                      <h2 className="font-display text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                      <h2 className="font-display text-lg sm:text-xl font-bold text-on-surface tracking-tight">
                         Prime Corridors, Ranked By Live Signal
                       </h2>
                     </div>
@@ -842,15 +842,15 @@ export default function PlacesPage() {
               </section>
 
               {/* Regional Route Comparison Matrix */}
-              <section className="w-full bg-surface-container-low border-y border-outline-variant/40 py-14 sm:py-20">
+              <section className="w-full bg-surface-container-low border-y border-outline-variant/40 py-8 sm:py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="max-w-2xl mb-8">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary mb-2">
+                  <div className="max-w-2xl mb-6 sm:mb-8">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary mb-1.5">
                       <span className="material-symbols-outlined text-[16px]">analytics</span>
-                      Algorithmic Corridors Matrix
+                      Travel Routes &amp; Corridor Comparison
                     </div>
-                    <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">Compare Major Expedition Vectors</h2>
-                    <p className="text-sm text-on-surface-variant mt-2">
+                    <h2 className="font-display text-lg sm:text-xl font-bold text-on-surface tracking-tight">Compare Major Expedition Vectors</h2>
+                    <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
                       Evaluate altitude gradients, transit durations from Islamabad, fuel stops, and vehicle specifications.
                     </p>
                   </div>
@@ -901,20 +901,20 @@ export default function PlacesPage() {
               </section>
 
               {/* Conversion Banner */}
-              <section className="w-full bg-surface py-14 sm:py-20">
+              <section className="w-full bg-surface py-8 sm:py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="relative overflow-hidden rounded-3xl bg-primary p-8 sm:p-12 text-on-primary shadow-elevated">
+                  <div className="relative overflow-hidden rounded-3xl bg-primary p-6 sm:p-10 text-on-primary shadow-elevated">
                     <div className="absolute -right-20 -bottom-20 w-96 h-96 rounded-full bg-secondary/30 blur-3xl pointer-events-none" />
                     <div className="absolute -left-20 -top-20 w-80 h-80 rounded-full bg-tertiary-fixed/20 blur-2xl pointer-events-none" />
-                    <div className="relative z-10 max-w-2xl space-y-5">
-                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold uppercase tracking-wider text-on-primary w-fit">
+                    <div className="relative z-10 max-w-2xl space-y-4">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold uppercase tracking-wider text-on-primary w-fit">
                         <span className="material-symbols-outlined text-sm">auto_awesome</span>
                         Autonomous Travel Synthesis
                       </div>
-                      <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-[1.08] tracking-tight text-on-primary">
+                      <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold leading-tight tracking-tight text-on-primary">
                         Can&rsquo;t decide which geographic frontier suits your calendar?
                       </h2>
-                      <p className="text-sm sm:text-base text-on-primary/70 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-on-primary/80 leading-relaxed">
                         Let the WanderAI Concierge compute an individualized itinerary balancing
                         real-time mountain pass weather, vehicle ground clearance, and
                         acclimatization safety margins.

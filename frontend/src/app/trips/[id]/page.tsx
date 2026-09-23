@@ -820,17 +820,7 @@ export default function TripDetailPage() {
         <Navbar />
 
         <main className="w-full pt-20 sm:pt-24 bg-background">
-          <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-20 space-y-6 sm:space-y-8">
-            {/* Breadcrumb skeleton */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 sm:pt-6 pb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-16 h-4 rounded bg-surface-container animate-pulse" />
-                <div className="w-3 h-3 rounded bg-surface-container animate-pulse" />
-                <div className="w-32 h-4 rounded bg-surface-container animate-pulse" />
-              </div>
-              <div className="w-24 h-6 rounded-full bg-surface-container animate-pulse" />
-            </div>
-
+          <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16 space-y-6 sm:space-y-8">
             {/* Itinerary Command Header Skeleton */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-outline-variant/60">
               <div className="space-y-3">
@@ -908,21 +898,9 @@ export default function TripDetailPage() {
         <div className="flex flex-col w-full">
 
           {/* Ambient Glow & Container */}
-          <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-20 overflow-hidden">
+          <div className="relative w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16 overflow-hidden">
             <div className="absolute -top-40 right-10 w-96 h-96 rounded-full bg-secondary/5 blur-3xl pointer-events-none -z-10" />
             <div className="absolute top-96 -left-32 w-80 h-80 rounded-full bg-tertiary-fixed-dim/10 blur-3xl pointer-events-none -z-10" />
-
-            {/* Breadcrumb & Monospace Tracker */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-4 sm:pt-6 pb-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-on-surface-variant">
-                <Link className="hover:text-on-surface transition-colors" href="/trips">My Trips</Link>
-                <span>/</span>
-                <span className="text-on-surface font-semibold truncate max-w-[240px] sm:max-w-md">{trip.title}</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs text-outline font-mono">{destLoc.name} · {destLoc.province} Sector</span>
-              </div>
-            </div>
 
             {/* Trip Summary Header Banner */}
             <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm relative overflow-hidden mb-6 sm:mb-8 border border-outline-variant/50">
@@ -956,10 +934,10 @@ export default function TripDetailPage() {
                       {destInterests.categoryBadge}
                     </span>
                   </div>
-                  <h1 className="font-display text-xl sm:text-2xl lg:text-4xl font-extrabold text-on-surface tracking-tight leading-tight mt-1 break-words">
+                  <h1 className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-on-surface tracking-tight leading-tight mt-1 break-words">
                     {trip.title}
                   </h1>
-                  <p className="font-sans text-xs sm:text-sm md:text-base text-on-surface-variant leading-relaxed">
+                  <p className="font-sans text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                     {activeItinerary?.narrative || `A bespoke algorithmic route along the ${routeMetrics.corridorName} balancing ${destLoc.name} landmarks, regional heritage, and authentic culinary stops.`}
                   </p>
                 </div>

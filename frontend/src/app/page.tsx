@@ -680,15 +680,15 @@ export default function HomePage() {
       )}
 
       {/* ==================== 2. MAIN CONTENT ==================== */}
-      <main className="w-full bg-background flex-grow ">
+      <main className="w-full bg-background flex-grow">
         <div className="flex flex-col w-full">
           {/* Top Ambient Backlight Gradients */}
-          <div className="relative w-full overflow-hidden pt-12">
+          <div className="relative w-full overflow-hidden">
             <div className="absolute -top-32 -left-32  w-96 h-96 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"></div>
             <div className="absolute top-48 right-0 w-[500px] h-[500px] rounded-full bg-tertiary-fixed/30 blur-3xl pointer-events-none"></div>
 
             {/* ==================== HERO SECTION ==================== */}
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-10 sm:pb-10 w-full">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-8 sm:pb-10 w-full">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                 {/* Hero Text & Conversational AI Entry */}
                 <div className="lg:col-span-7 flex flex-col gap-5 z-10">
