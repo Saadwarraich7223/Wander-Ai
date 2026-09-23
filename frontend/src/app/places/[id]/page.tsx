@@ -6,18 +6,13 @@ import { useParams, useRouter } from "next/navigation";
 import { api, placesApi, tripsApi } from "@/lib/api";
 import { City, PlaceDetail, PlaceSummary, Trip } from "@/types";
 import Navbar from "@/components/Navbar";
-import FairPriceModal from "@/components/FairPriceModal";
-import CorridorIntelModal from "@/components/CorridorIntelModal";
-import CorridorIntelSection from "@/components/CorridorIntelSection";
 import {
   FieldIntelReport,
   ROAD_CONDITION_LABELS,
   FUEL_STATUS_LABELS,
   ATM_STATUS_LABELS,
   formatTimeAgo,
-  getStoredReports,
   getReportsForPlace,
-  saveReport,
 } from "@/lib/corridorIntel";
 
 type CohortKey = "solo" | "duo" | "family";
@@ -128,11 +123,6 @@ export default function PlaceDetailPage() {
 
   const [saved, setSaved] = useState(false);
   const [visited, setVisited] = useState(false);
-  const [showFairPriceModal, setShowFairPriceModal] = useState(false);
-  const [showIntelModal, setShowIntelModal] = useState(false);
-  const [showUnverifiedModal, setShowUnverifiedModal] = useState(false);
-  const [isLocallyVerified, setIsLocallyVerified] = useState(false);
-  const [reportsVersion, setReportsVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -254,45 +244,6 @@ export default function PlaceDetailPage() {
   const anchors = siblings.length + 1;
   const connectivity = Math.round((place?.data_confidence ?? 0.95) * 100);
 
-  // Check if current user is an authenticated in-trip explorer for this destination
-  const isVerifiedExplorer = useMemo(() => {
-    if (!place || !trips || trips.length === 0) return false;
-    const pId = String(place.id).toLowerCase();
-    const pSlug = (place.slug || "").toLowerCase();
-    const pName = place.name.toLowerCase().trim();
-    const pCityId = place.city_id;
-
-    return trips.some((t) => {
-      // 1. Destination city match
-      if (pCityId && t.city_id === pCityId) return true;
-      if (t.preferences?.destination && pName && t.preferences.destination.toLowerCase().includes(pName)) return true;
-
-      // 2. Scheduled waypoint in any itinerary day
-      const itineraryDays = t.active_itinerary?.days || [];
-      for (const d of itineraryDays) {
-        for (const it of d.items || []) {
-          const itPlaceId = String(it.place?.id || (it as any).place_id || "").toLowerCase();
-          const itPlaceSlug = (it.place?.slug || "").toLowerCase();
-          const itPlaceName = (it.place?.name || "").toLowerCase().trim();
-          if (itPlaceId === pId || (pSlug && itPlaceSlug === pSlug) || itPlaceName === pName) {
-            return true;
-          }
-        }
-      }
-      return false;
-    });
-  }, [place, trips]);
-
-  const canSubmitReport = isVerifiedExplorer || isLocallyVerified;
-
-  const handleOpenReportModal = useCallback(() => {
-    if (canSubmitReport) {
-      setShowIntelModal(true);
-    } else {
-      setShowUnverifiedModal(true);
-    }
-  }, [canSubmitReport]);
-
   // Synchronized multi-indexed crowdsourced reports for this place & corridor
   const placeReports = useMemo(() => {
     return getReportsForPlace({
@@ -303,12 +254,13 @@ export default function PlaceDetailPage() {
       cityName: city?.name,
       corridorName: regionName ? `${regionName} Corridor` : undefined,
     });
-  }, [place, placeId, city, regionName, reportsVersion]);
+  }, [place, placeId, city, regionName]);
 
-  const handleAddPlaceReport = (report: FieldIntelReport) => {
-    saveReport(place?.id || placeId, report);
-    setReportsVersion((v) => v + 1);
-  };
+  const uniqueTouristsCount = useMemo(() => {
+    if (placeReports.length === 0) return 0;
+    const contributorKeys = new Set(placeReports.map((r) => r.tripId || r.id));
+    return Math.max(1, contributorKeys.size);
+  }, [placeReports]);
 
   const handleCreateTrip = useCallback(() => {
     if (!place) return;
@@ -442,80 +394,87 @@ export default function PlaceDetailPage() {
             </div>
           </div>
 
-          {/* Live Ground-Truth Corridor Intelligence Micro-Widget */}
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-lowest border border-emerald-500/30 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                <span className="material-symbols-outlined text-xl">hub</span>
-              </div>
-              <div>
+          {/* Live Ground-Truth Corridor Telemetry (Minimal & Ultra-Premium, rendered only when real logs exist) */}
+          {placeReports.length > 0 && (
+            <div className="rounded-2xl bg-surface-container-lowest/90 border border-outline-variant/60 shadow-xs p-3.5 sm:p-4 space-y-2.5">
+              {/* Top Meta Line */}
+              <div className="flex items-center justify-between gap-2 flex-wrap pb-1.5 border-b border-outline-variant/30">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-800 bg-emerald-500/15 px-2 py-0.5 rounded">
-                    Live Corridor Telemetry
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
+                    Live Field Telemetry
                   </span>
-                  {placeReports.length > 0 ? (
-                    <span className="text-xs text-on-surface-variant font-medium">
-                      Verified <strong>{formatTimeAgo(placeReports[0].timestamp)}</strong> by traveler ({placeReports.length} {placeReports.length === 1 ? "report" : "reports"})
-                    </span>
-                  ) : (
-                    <span className="text-xs text-on-surface-variant font-medium">
-                      No crowdsourced reports logged yet for this location
-                    </span>
-                  )}
-                  {canSubmitReport && (
-                    <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-800 px-2 py-0.5 rounded flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs text-emerald-600">verified_user</span>
-                      VERIFIED EXPLORER
-                    </span>
-                  )}
+                  <span className="text-[11px] text-on-surface-variant font-medium">
+                    · Logged {formatTimeAgo(placeReports[0].timestamp)} ({placeReports.length} {placeReports.length === 1 ? "report" : "reports"} by {uniqueTouristsCount} {uniqueTouristsCount === 1 ? "tourist" : "tourists"})
+                  </span>
                 </div>
-
-                {placeReports.length > 0 ? (
-                  <div className="mt-1 space-y-0.5">
-                    <p className="text-xs font-semibold text-on-surface">
-                      Road: <span className="text-emerald-700 font-bold">{ROAD_CONDITION_LABELS[placeReports[0].roadCondition]?.label.split("(")[0]}</span> · Fuel: <span className="text-secondary font-bold">{FUEL_STATUS_LABELS[placeReports[0].fuelStatus]?.label.split("(")[0]}</span> · ATM: <span className="text-secondary font-bold">{ATM_STATUS_LABELS[placeReports[0].atmStatus]?.label.split("(")[0]}</span>
-                    </p>
-                    {placeReports[0].note && (
-                      <p className="text-xs text-on-surface-variant italic">
-                        Traveler Note: &ldquo;{placeReports[0].note}&rdquo;
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    {canSubmitReport
-                      ? "You are a verified explorer on this route. Broadcast the first live road, fuel pump, or ATM conditions!"
-                      : "Verified in-trip explorers can broadcast live ground-truth road, fuel pump, and ATM status."}
-                  </p>
+                {placeReports[0].verifiedInTrip && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-800 border border-emerald-500/25 px-2 py-0.5 rounded-full">
+                    <span className="material-symbols-outlined text-[12px] text-emerald-600">verified</span>
+                    VERIFIED IN-TRIP
+                  </span>
                 )}
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
-              <button
-                onClick={() => setShowFairPriceModal(true)}
-                className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-emerald-800 border border-emerald-500/30 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-sm text-emerald-600">price_check</span>
-                <span>Fair Rates</span>
-              </button>
-              <button
-                onClick={handleOpenReportModal}
-                className="px-3.5 py-1.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-sm">campaign</span>
-                <span>
-                  {canSubmitReport
-                    ? placeReports.length > 0
-                      ? "Report Update"
-                      : "+ Submit Report"
-                    : "+ Report (In-Trip Only)"}
-                </span>
-              </button>
+              {/* 3 Minimal Telemetry Micro-Pill Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Road Condition */}
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/40 min-w-0">
+                  <span className="material-symbols-outlined text-base text-secondary shrink-0">
+                    {ROAD_CONDITION_LABELS[placeReports[0].roadCondition]?.icon || "traffic"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-medium block">
+                      Road Condition
+                    </span>
+                    <span className="text-xs font-bold text-on-surface truncate block">
+                      {ROAD_CONDITION_LABELS[placeReports[0].roadCondition]?.label.split("(")[0].trim()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Fuel Pump */}
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/40 min-w-0">
+                  <span className="material-symbols-outlined text-base text-secondary shrink-0">
+                    {FUEL_STATUS_LABELS[placeReports[0].fuelStatus]?.icon || "local_gas_station"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-medium block">
+                      Fuel Pump
+                    </span>
+                    <span className="text-xs font-bold text-on-surface truncate block">
+                      {FUEL_STATUS_LABELS[placeReports[0].fuelStatus]?.label.split("(")[0].trim()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ATM / Cash */}
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/40 min-w-0">
+                  <span className="material-symbols-outlined text-base text-secondary shrink-0">
+                    {ATM_STATUS_LABELS[placeReports[0].atmStatus]?.icon || "payments"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-medium block">
+                      ATM &amp; Cash
+                    </span>
+                    <span className="text-xs font-bold text-on-surface truncate block">
+                      {ATM_STATUS_LABELS[placeReports[0].atmStatus]?.label.split("(")[0].trim()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Traveler Observation Note (Minimalist Quote Callout) */}
+              {placeReports[0].note && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-surface-container-low/70 border border-secondary/20 text-xs">
+                  <span className="material-symbols-outlined text-sm text-secondary shrink-0 mt-0.5">format_quote</span>
+                  <p className="text-xs text-on-surface font-medium italic leading-snug">
+                    &ldquo;{placeReports[0].note}&rdquo;
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
@@ -919,16 +878,6 @@ export default function PlaceDetailPage() {
           </div>
         </section>
 
-        {/* Ground-Truth Corridor Intelligence & Fair Tariffs Section */}
-        <CorridorIntelSection
-          destinationName={place?.name || "Destination"}
-          corridorName={`${regionName} Corridor`}
-          passabilityPercent={connectivity}
-          recentReports={placeReports}
-          onOpenReportModal={handleOpenReportModal}
-          onOpenFairPriceModal={() => setShowFairPriceModal(true)}
-        />
-
         <section className="space-y-4">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
@@ -1115,123 +1064,6 @@ export default function PlaceDetailPage() {
         </div>
       )}
 
-      {/* Verified Explorer Gate Modal (Anti-Spam Protection) */}
-      {showUnverifiedModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
-          onClick={() => setShowUnverifiedModal(false)}
-        >
-          <div
-            className="bg-surface-container-lowest rounded-3xl shadow-2xl max-w-md w-full border border-outline-variant/60 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 bg-surface-container-low border-b border-outline-variant/40 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-700 flex items-center justify-center font-bold shrink-0">
-                  <span className="material-symbols-outlined text-2xl">verified_user</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-800 bg-amber-500/15 px-2 py-0.5 rounded">
-                    Ground-Truth Verification
-                  </span>
-                  <h3 className="font-display text-base font-bold text-on-surface mt-0.5">
-                    Verified In-Trip Explorer Check
-                  </h3>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowUnverifiedModal(false)}
-                className="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer"
-                title="Close"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xl">close</span>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                To eliminate fake reviews, outdated rumors, and unverified spam, <strong>live road, fuel, and ATM telemetry can only be submitted by travelers with {place?.name || "this destination"} in their active or planned itinerary</strong>.
-              </p>
-
-              <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/50 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-on-surface-variant">Destination</span>
-                  <span className="text-on-surface font-bold">{place?.name}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-on-surface-variant">Itinerary Status</span>
-                  <span className="text-amber-800 font-mono text-[11px] bg-amber-500/15 px-2 py-0.5 rounded font-bold">
-                    Not in active trips
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <button
-                  onClick={() => {
-                    setShowUnverifiedModal(false);
-                    if (place) openAddStop(place.id);
-                  }}
-                  className="w-full py-2.5 px-4 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-base">add_location_alt</span>
-                  <span>Add {place?.name} to Existing Trip</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowUnverifiedModal(false);
-                    handleCreateTrip();
-                  }}
-                  className="w-full py-2.5 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-display text-xs font-semibold border border-outline-variant/60 transition flex items-center justify-center gap-2 cursor-pointer"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-base text-secondary">tune</span>
-                  <span>Plan Expedition to {place?.name}</span>
-                </button>
-
-                <div className="pt-2 border-t border-outline-variant/30 text-center">
-                  <button
-                    onClick={() => {
-                      setIsLocallyVerified(true);
-                      setShowUnverifiedModal(false);
-                      setShowIntelModal(true);
-                    }}
-                    className="text-[11px] font-semibold text-secondary hover:underline cursor-pointer inline-flex items-center gap-1"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-xs">pin_drop</span>
-                    <span>I am currently on-site here (Verify Local Presence)</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Fair Price Guide Modal */}
-      <FairPriceModal
-        isOpen={showFairPriceModal}
-        onClose={() => setShowFairPriceModal(false)}
-        activeRegionName={regionName}
-      />
-
-      {/* 1-Tap Corridor Field Intelligence Modal */}
-      <CorridorIntelModal
-        isOpen={showIntelModal}
-        onClose={() => setShowIntelModal(false)}
-        placeId={place?.id || placeId}
-        placeSlug={place?.slug}
-        placeName={place?.name || "Regional Stop"}
-        corridorName={`${regionName} Corridor`}
-        cityId={place?.city_id}
-        cityName={city?.name}
-        verifiedInTrip={canSubmitReport}
-        onSubmitReport={handleAddPlaceReport}
-      />
     </div>
   );
 }

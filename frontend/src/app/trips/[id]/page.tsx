@@ -656,6 +656,12 @@ export default function TripDetailPage() {
     });
   }, [tripId, tripWaypoints, trip?.city_id, routeMetrics.corridorName, reportsVersion]);
 
+  const uniqueTouristsCount = useMemo(() => {
+    if (fieldReports.length === 0) return 0;
+    const contributorKeys = new Set(fieldReports.map((r) => r.tripId || r.id));
+    return Math.max(1, contributorKeys.size);
+  }, [fieldReports]);
+
   const handleAddIntelReport = (newReport: FieldIntelReport) => {
     saveReport(tripId, newReport);
     setReportsVersion((v) => v + 1);
@@ -1214,7 +1220,7 @@ export default function TripDetailPage() {
                       )}
                       <span className="text-outline hidden sm:inline">•</span>
                       <span className="text-[10px] text-on-surface-variant font-mono">
-                        Logged {formatTimeAgo(fieldReports[0].timestamp)}
+                        Logged {formatTimeAgo(fieldReports[0].timestamp)} ({fieldReports.length} {fieldReports.length === 1 ? "report" : "reports"} by {uniqueTouristsCount} {uniqueTouristsCount === 1 ? "tourist" : "tourists"})
                       </span>
                     </div>
                   ) : (

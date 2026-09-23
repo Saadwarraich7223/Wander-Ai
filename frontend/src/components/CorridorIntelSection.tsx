@@ -29,6 +29,12 @@ export default function CorridorIntelSection({
   const latestReport = recentReports.length > 0 ? recentReports[0] : null;
   const hasReports = recentReports.length > 0;
 
+  const uniqueTouristsCount = React.useMemo(() => {
+    if (recentReports.length === 0) return 0;
+    const contributorKeys = new Set(recentReports.map((r) => r.tripId || r.id));
+    return Math.max(1, contributorKeys.size);
+  }, [recentReports]);
+
   const roadInfo = latestReport
     ? ROAD_CONDITION_LABELS[latestReport.roadCondition]
     : {
@@ -70,7 +76,7 @@ export default function CorridorIntelSection({
               {hasReports ? (
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-800 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  CROWD-VERIFIED ({recentReports.length} {recentReports.length === 1 ? "REPORT" : "REPORTS"})
+                  CROWD-VERIFIED ({recentReports.length} {recentReports.length === 1 ? "REPORT" : "REPORTS"} BY {uniqueTouristsCount} {uniqueTouristsCount === 1 ? "TOURIST" : "TOURISTS"})
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/60">
@@ -85,7 +91,7 @@ export default function CorridorIntelSection({
               <p className="text-xs text-on-surface-variant font-medium mt-0.5 flex items-center gap-1">
                 <span className="material-symbols-outlined text-xs text-emerald-600">verified</span>
                 <span>
-                  Latest status logged <strong>{formatTimeAgo(latestReport!.timestamp)}</strong> for <strong>{latestReport!.placeName}</strong>.
+                  Latest status logged <strong>{formatTimeAgo(latestReport!.timestamp)}</strong> for <strong>{latestReport!.placeName}</strong> ({recentReports.length} {recentReports.length === 1 ? "report" : "reports"} submitted by {uniqueTouristsCount} {uniqueTouristsCount === 1 ? "tourist" : "tourists"}).
                 </span>
               </p>
             ) : (

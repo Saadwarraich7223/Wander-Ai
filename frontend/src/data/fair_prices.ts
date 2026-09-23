@@ -1,0 +1,226 @@
+/**
+ * Verified Fair Price Benchmark Index & Union Rates across Pakistan.
+ * Designed to eliminate scamming, price-gouging, and give travelers
+ * transparent benchmark data for jeep hires, boat tours, safari rigs, and local guides.
+ */
+
+export interface FairPriceItem {
+  id: string;
+  serviceName: string;
+  category: "jeep_4x4" | "boat_marine" | "guide" | "activity" | "horse_camel";
+  region: "Gilgit-Baltistan & Baltistan" | "KPK & Kaghan/Swat" | "Punjab & Cholistan" | "Balochistan & Sindh" | "Azad Kashmir";
+  corridor: string;
+  fairRangePkr: string;
+  minPrice: number;
+  maxPrice: number;
+  pricingBasis: string; // e.g. "Roundtrip with 2hr wait", "Per Person", "Full Day Safari"
+  unionStandLocation?: string;
+  cautionNotes: string;
+  negotiationTip: string;
+}
+
+export const FAIR_PRICE_DATABASE: FairPriceItem[] = [
+  // ── Gilgit-Baltistan & Baltistan ────────────────────────────
+  {
+    id: "fairy-meadows-jeep",
+    serviceName: "Fairy Meadows 4x4 Jeep (Raikot Bridge to Tattu)",
+    category: "jeep_4x4",
+    region: "Gilgit-Baltistan & Baltistan",
+    corridor: "Karakoram Highway / Diamer",
+    fairRangePkr: "PKR 10,000 – 12,000",
+    minPrice: 10000,
+    maxPrice: 12000,
+    pricingBasis: "Fixed Union Rate (Roundtrip including return wait up to 3 days)",
+    unionStandLocation: "Raikot Bridge Jeep Union Office, KKH",
+    cautionNotes: "Private vehicles strictly forbidden. Register your name at the union counter ticket booth before boarding.",
+    negotiationTip: "This is a strictly fixed district union tariff. Do not pay private touts above the posted counter receipt.",
+  },
+  {
+    id: "deosai-safari-skardu",
+    serviceName: "Deosai Plateau Full-Day 4x4 Safari (Skardu to Sheosar Lake)",
+    category: "jeep_4x4",
+    region: "Gilgit-Baltistan & Baltistan",
+    corridor: "Skardu / Deosai National Park",
+    fairRangePkr: "PKR 18,000 – 22,000",
+    minPrice: 18000,
+    maxPrice: 22000,
+    pricingBasis: "Full Day Safari (Up to 6 Passengers, Return to Skardu)",
+    unionStandLocation: "Skardu Central Jeep Stand, Yadgar Chowk",
+    cautionNotes: "Verify driver has spare tire, tow cable, and high-clearance Prado/TLC. River crossings (Kala Pani) require experienced drivers.",
+    negotiationTip: "Book through Skardu Jeep Union or directly with driver a day prior. Rate includes fuel and park transit stops.",
+  },
+  {
+    id: "attabad-boat-tour",
+    serviceName: "Attabad Lake Scenic Speedboat Tour",
+    category: "boat_marine",
+    region: "Gilgit-Baltistan & Baltistan",
+    corridor: "Hunza / Gojal Valley",
+    fairRangePkr: "PKR 2,500 – 3,500",
+    minPrice: 2500,
+    maxPrice: 3500,
+    pricingBasis: "Per Boat (15-20 min scenic cruise, up to 6 passengers)",
+    unionStandLocation: "Attabad Lake Main Boat Jetty & Pier",
+    cautionNotes: "Life jackets are legally mandatory for all passengers before boat departs jetty.",
+    negotiationTip: "Shared rides cost PKR 500-600/person if solo. Private charters cost PKR 3,000 flat.",
+  },
+  {
+    id: "khunjerab-pass-van",
+    serviceName: "Khunjerab Pass (Pak-China Border) Excursion",
+    category: "jeep_4x4",
+    region: "Gilgit-Baltistan & Baltistan",
+    corridor: "Upper Hunza / Sost / Khunjerab",
+    fairRangePkr: "PKR 14,000 – 17,000",
+    minPrice: 14000,
+    maxPrice: 17000,
+    pricingBasis: "Full Day Trip from Karimabad/Aliabad (AC Hiace or Prado)",
+    unionStandLocation: "Karimabad / Aliabad Taxi Stand",
+    cautionNotes: "Khunjerab National Park fee (PKR 500/Pakistani, $15/Foreigner) is paid separately at Dhee checkpost.",
+    negotiationTip: "Split costs among 4-6 travelers in a Grand Cabin or Hiace to keep per-person cost under PKR 3,000.",
+  },
+  {
+    id: "shigar-khaplu-daytrip",
+    serviceName: "Shigar & Khaplu Royal Forts Circuit",
+    category: "jeep_4x4",
+    region: "Gilgit-Baltistan & Baltistan",
+    corridor: "Baltistan Valley",
+    fairRangePkr: "PKR 12,000 – 15,000",
+    minPrice: 12000,
+    maxPrice: 15000,
+    pricingBasis: "Full Day Hire (Return to Skardu)",
+    unionStandLocation: "Skardu Taxi & Jeep Stand",
+    cautionNotes: "Road to Shigar and Khaplu is paved asphalt — standard sedans or crossover vehicles can also make this trip safely.",
+    negotiationTip: "If driving your own car, you do not need to hire a jeep for Shigar/Khaplu.",
+  },
+
+  // ── KPK & Kaghan / Swat ─────────────────────────────────────
+  {
+    id: "saif-ul-malook-jeep",
+    serviceName: "Lake Saif-ul-Malook 4x4 Mountain Jeep",
+    category: "jeep_4x4",
+    region: "KPK & Kaghan/Swat",
+    corridor: "Kaghan Valley / Naran",
+    fairRangePkr: "PKR 8,000 – 10,000",
+    minPrice: 8000,
+    maxPrice: 10000,
+    pricingBasis: "Roundtrip with 2-hour wait at the lake (up to 7 passengers)",
+    unionStandLocation: "Naran Central Jeep Stand, Main Bazaar",
+    cautionNotes: "Road is steep, rocky, and narrow. Sedans cannot pass. Jeep union operates standard rate ticket booths.",
+    negotiationTip: "Avoid roadside touts outside hotels. Walk to the main Naran Union Stand for the regulated receipt rate.",
+  },
+  {
+    id: "shogran-siri-paye",
+    serviceName: "Shogran to Siri Paye Meadows 4x4 Jeep",
+    category: "jeep_4x4",
+    region: "KPK & Kaghan/Swat",
+    corridor: "Kaghan Valley / Shogran",
+    fairRangePkr: "PKR 4,500 – 6,000",
+    minPrice: 4500,
+    maxPrice: 6000,
+    pricingBasis: "Roundtrip with 2-hour halt at Siri Paye Meadows",
+    unionStandLocation: "Shogran Bazaar Jeep Stand (Near Pine Park Hotel)",
+    cautionNotes: "Extremely muddy and rutted track after rain. Do not attempt on personal crossover or car.",
+    negotiationTip: "Standard union rate is PKR 5,000. Off-season (May, October) can be negotiated down to PKR 4,000.",
+  },
+  {
+    id: "kumrat-jahaz-banda-jeep",
+    serviceName: "Kumrat Valley to Jahaz Banda Trek Base (Thal to Forest)",
+    category: "jeep_4x4",
+    region: "KPK & Kaghan/Swat",
+    corridor: "Dir Kohistan / Kumrat Valley",
+    fairRangePkr: "PKR 12,000 – 15,000",
+    minPrice: 12000,
+    maxPrice: 15000,
+    pricingBasis: "Roundtrip Hire from Thal Bazaar to Kumrat Forest & Jaki",
+    unionStandLocation: "Thal Bazaar Central Jeep Stand",
+    cautionNotes: "Riverbed track with boulder obstacles and water crossings. 4x4 mandatory.",
+    negotiationTip: "Hire from Thal directly. Ensure driver confirms return pick-up time if camping overnight in Jahaz Banda.",
+  },
+  {
+    id: "malam-jabba-chairlift",
+    serviceName: "Malam Jabba Ski Resort Chairlift & Zipline",
+    category: "activity",
+    region: "KPK & Kaghan/Swat",
+    corridor: "Swat Valley / Malam Jabba",
+    fairRangePkr: "PKR 1,200 – 1,800",
+    minPrice: 1200,
+    maxPrice: 1800,
+    pricingBasis: "Per Person (Full Chairlift Circuit)",
+    unionStandLocation: "Malam Jabba Resort Ticket Counter",
+    cautionNotes: "Official resort counter tickets only. Children under 3 free.",
+    negotiationTip: "Fixed ticket prices at the official counter. Combo tickets (Chairlift + Zipline) offer ~20% discount.",
+  },
+
+  // ── Punjab & Cholistan ──────────────────────────────────────
+  {
+    id: "cholistan-desert-safari",
+    serviceName: "Cholistan Desert 4x4 Safari (Derawar Fort to Channan Pir)",
+    category: "jeep_4x4",
+    region: "Punjab & Cholistan",
+    corridor: "Bahawalpur / Cholistan Desert",
+    fairRangePkr: "PKR 14,000 – 18,000",
+    minPrice: 14000,
+    maxPrice: 18000,
+    pricingBasis: "Full Day Desert Safari with experienced desert pilot & tire deflation",
+    unionStandLocation: "Bahawalpur City / Ahmedpur East Jeep Union",
+    cautionNotes: "Sand dunes beyond Derawar require tire pressure at 16-18 PSI. Always carry minimum 4L drinking water per person.",
+    negotiationTip: "Combine Derawar Fort, Royal Tombs, and Channan Pir in a single full-day package.",
+  },
+  {
+    id: "derawar-camel-ride",
+    serviceName: "Derawar Fort Bastion Camel Stroll",
+    category: "horse_camel",
+    region: "Punjab & Cholistan",
+    corridor: "Cholistan Desert / Derawar",
+    fairRangePkr: "PKR 500 – 800",
+    minPrice: 500,
+    maxPrice: 800,
+    pricingBasis: "Per Camel (15-20 min perimeter ride around the 40 bastions)",
+    unionStandLocation: "Derawar Fort Main Gate Entrance",
+    cautionNotes: "Confirm price before mounting the camel to avoid dispute at drop-off.",
+    negotiationTip: "State PKR 500 clearly before boarding. If traveling as a group of 3+, negotiate PKR 400 per camel.",
+  },
+  {
+    id: "walled-city-rangeela-rickshaw",
+    serviceName: "Lahore Walled City Rangeela Rickshaw Heritage Tour",
+    category: "activity",
+    region: "Punjab & Cholistan",
+    corridor: "Lahore Heritage Trail",
+    fairRangePkr: "PKR 2,500 – 3,500",
+    minPrice: 2500,
+    maxPrice: 3500,
+    pricingBasis: "Per Decorated Rickshaw (2-3 Hours Guided Heritage Trail)",
+    unionStandLocation: "Delhi Gate Walled City Authority Counter",
+    cautionNotes: "Book through the official Walled City of Lahore Authority (WCLA) booth at Delhi Gate.",
+    negotiationTip: "Official WCLA tours include entrance to Shahi Hammam and Wazir Khan Mosque.",
+  },
+
+  // ── Balochistan & Sindh ─────────────────────────────────────
+  {
+    id: "hingol-kund-malir-tour",
+    serviceName: "Hingol National Park & Kund Malir Safari",
+    category: "jeep_4x4",
+    region: "Balochistan & Sindh",
+    corridor: "Makran Coastal Highway (N-10)",
+    fairRangePkr: "PKR 16,000 – 20,000",
+    minPrice: 16000,
+    maxPrice: 20000,
+    pricingBasis: "Full Day Car/Van Charter from Karachi (Covers Princess of Hope & Beach)",
+    unionStandLocation: "Karachi Rental Operators / Hub Chowki",
+    cautionNotes: "Fill fuel tank completely in Hub Chowki. Fuel stations on Makran Highway are sparse.",
+    negotiationTip: "Makran Coastal Highway is fully paved asphalt. A standard Sedan can make this trip easily — no 4x4 needed.",
+  },
+  {
+    id: "astola-island-boat",
+    serviceName: "Astola Island Speedboat Expedition (Pasni to Island)",
+    category: "boat_marine",
+    region: "Balochistan & Sindh",
+    corridor: "Pasni / Gwadar Offshore",
+    fairRangePkr: "PKR 35,000 – 45,000",
+    minPrice: 35000,
+    maxPrice: 45000,
+    pricingBasis: "Group Boat (Roundtrip with overnight stay or 4hr island explore, up to 8 pax)",
+    unionStandLocation: "Pasni Fishery Harbor",
+    cautionNotes: "Open sea voyage (3-4 hours each way). Check Pakistan Navy & coast guard weather advisory before sailing.",
+    negotiationTip: "Split across 6-8 travelers to bring individual cost to PKR 5,000 – 6,000.",
+  },
+];
