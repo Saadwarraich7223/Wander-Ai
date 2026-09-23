@@ -1,6 +1,7 @@
 """Models package — import all for Alembic autodiscovery."""
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
+from app.models.intel import CorridorIntelReport
 from app.models.interaction import UserInteraction
 from app.models.place import Category, City, Place, PlaceImage, PlaceTag, Region, Tag
 from app.models.trip import Itinerary, ItineraryDay, ItineraryItem, Trip
@@ -30,4 +31,6 @@ __all__ = [
     "Itinerary",
     "ItineraryDay",
     "ItineraryItem",
+    # Intel domain
+    "CorridorIntelReport",
 ]

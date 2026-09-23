@@ -9,12 +9,20 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.database import engine
+from app.models.base import Base
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
-    # Startup actions (e.g. check DB connections, warm up caches)
+    # Startup actions: guarantee DB tables are created
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        import logging
+        logging.warning(f"Database initialization warning on startup: {e}")
     yield
     # Shutdown actions (e.g. close client pools)
 

@@ -13,6 +13,7 @@ import {
   ATM_STATUS_LABELS,
   formatTimeAgo,
   getReportsForPlace,
+  fetchReportsFromApi,
 } from "@/lib/corridorIntel";
 
 type CohortKey = "solo" | "duo" | "family";
@@ -244,8 +245,31 @@ export default function PlaceDetailPage() {
   const anchors = siblings.length + 1;
   const connectivity = Math.round((place?.data_confidence ?? 0.95) * 100);
 
-  // Synchronized multi-indexed crowdsourced reports for this place & corridor
+  // Synchronized crowdsourced reports from central database + local cache
+  const [liveReports, setLiveReports] = useState<FieldIntelReport[]>([]);
+
+  useEffect(() => {
+    if (!placeId && !place) return;
+    let active = true;
+    fetchReportsFromApi({
+      placeId: place?.id || placeId,
+      placeSlug: place?.slug,
+      placeName: place?.name,
+      cityId: place?.city_id,
+      cityName: city?.name,
+      corridorName: regionName ? `${regionName} Corridor` : undefined,
+    }).then((reports) => {
+      if (active && reports && reports.length > 0) {
+        setLiveReports(reports);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [place, placeId, city, regionName]);
+
   const placeReports = useMemo(() => {
+    if (liveReports.length > 0) return liveReports;
     return getReportsForPlace({
       placeId: place?.id || placeId,
       placeSlug: place?.slug,
@@ -254,11 +278,11 @@ export default function PlaceDetailPage() {
       cityName: city?.name,
       corridorName: regionName ? `${regionName} Corridor` : undefined,
     });
-  }, [place, placeId, city, regionName]);
+  }, [liveReports, place, placeId, city, regionName]);
 
   const uniqueTouristsCount = useMemo(() => {
     if (placeReports.length === 0) return 0;
-    const contributorKeys = new Set(placeReports.map((r) => r.tripId || r.id));
+    const contributorKeys = new Set(placeReports.map((r) => r.reporterName || r.tripId || r.id));
     return Math.max(1, contributorKeys.size);
   }, [placeReports]);
 

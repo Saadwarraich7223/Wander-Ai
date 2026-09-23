@@ -1,3 +1,5 @@
+import { intelApi } from "./api";
+
 export interface FieldIntelReport {
   id: string;
   placeId?: string;
@@ -7,6 +9,7 @@ export interface FieldIntelReport {
   cityId?: string;
   cityName?: string;
   tripId?: string;
+  reporterName?: string;
   verifiedInTrip?: boolean;
   roadCondition: "paved_clear" | "patchy_potholes" | "jeep_4x4_only" | "landslide_blockage" | "snow_chains_req";
   fuelStatus: "fuel_ok" | "petrol_only" | "diesel_only" | "no_fuel";
@@ -63,7 +66,7 @@ const MASTER_KEY = "wander_intel_all_reports";
 
 /**
  * Reads all stored reports from the master list AND scans existing localStorage keys
- * to guarantee no user report is lost regardless of what key was used when saved.
+ * to guarantee instantaneous cached rendering before network responses arrive.
  */
 export function getAllReports(): FieldIntelReport[] {
   if (typeof window === "undefined") return [];
@@ -143,8 +146,7 @@ export interface PlaceReportQuery {
 }
 
 /**
- * Universal query to get all relevant crowdsourced reports for a place/destination.
- * Prioritizes place-specific direct reports first, then regional corridor telemetry.
+ * Synchronous client filter for instant cached rendering.
  */
 export function getReportsForPlace(query: PlaceReportQuery): FieldIntelReport[] {
   const all = getAllReports();
@@ -192,7 +194,6 @@ export function getReportsForPlace(query: PlaceReportQuery): FieldIntelReport[] 
     }
   }
 
-  // Return place-specific reports first, followed by corridor fallback reports
   return [...directPlaceReports, ...corridorReports];
 }
 
@@ -204,7 +205,7 @@ export interface TripReportQuery {
 }
 
 /**
- * Universal query to retrieve all reports for a trip and all its contained waypoints.
+ * Synchronous query to retrieve all reports for a trip and all its waypoints.
  */
 export function getReportsForTrip(query: TripReportQuery): FieldIntelReport[] {
   const all = getAllReports();
@@ -222,14 +223,12 @@ export function getReportsForTrip(query: TripReportQuery): FieldIntelReport[] {
   for (const r of all) {
     if (seenIds.has(r.id)) continue;
 
-    // Direct trip submission
     if (r.tripId && r.tripId === query.tripId) {
       matched.push(r);
       seenIds.add(r.id);
       continue;
     }
 
-    // Waypoint match
     const rId = r.placeId?.toLowerCase().trim();
     const rSlug = r.placeSlug?.toLowerCase().trim();
     const rNameNorm = normalizeKey(r.placeName);
@@ -245,7 +244,6 @@ export function getReportsForTrip(query: TripReportQuery): FieldIntelReport[] {
       continue;
     }
 
-    // Corridor match
     if (tripCityId && r.cityId && r.cityId === tripCityId) {
       matched.push(r);
       seenIds.add(r.id);
@@ -262,7 +260,7 @@ export function getReportsForTrip(query: TripReportQuery): FieldIntelReport[] {
 }
 
 /**
- * Saves a report into the master list and across all entity-indexed keys for instant synchronization.
+ * Saves a report into the master local cache.
  */
 export function saveReport(primaryKey: string, report: FieldIntelReport): FieldIntelReport[] {
   if (typeof window === "undefined") return [report];
@@ -270,25 +268,17 @@ export function saveReport(primaryKey: string, report: FieldIntelReport): FieldI
     const all = getAllReports();
     const updatedMaster = [report, ...all.filter((r) => r.id !== report.id)];
 
-    // 1. Update Master List
     localStorage.setItem(MASTER_KEY, JSON.stringify(updatedMaster));
-
-    // 2. Update Primary Key
     localStorage.setItem(`wander_intel_${primaryKey}`, JSON.stringify(updatedMaster));
 
-    // 3. Update Place ID index
     if (report.placeId) {
       localStorage.setItem(`wander_intel_${report.placeId}`, JSON.stringify(updatedMaster));
       localStorage.setItem(`wander_intel_place_${report.placeId}`, JSON.stringify(updatedMaster));
     }
-
-    // 4. Update Place Slug index
     if (report.placeSlug) {
       localStorage.setItem(`wander_intel_${report.placeSlug}`, JSON.stringify(updatedMaster));
       localStorage.setItem(`wander_intel_place_${report.placeSlug}`, JSON.stringify(updatedMaster));
     }
-
-    // 5. Update Normalized Place Name index
     if (report.placeName) {
       const pNorm = normalizeKey(report.placeName);
       if (pNorm) {
@@ -296,14 +286,10 @@ export function saveReport(primaryKey: string, report: FieldIntelReport): FieldI
         localStorage.setItem(`wander_intel_place_${pNorm}`, JSON.stringify(updatedMaster));
       }
     }
-
-    // 6. Update Trip ID index
     if (report.tripId) {
       localStorage.setItem(`wander_intel_${report.tripId}`, JSON.stringify(updatedMaster));
       localStorage.setItem(`wander_intel_trip_${report.tripId}`, JSON.stringify(updatedMaster));
     }
-
-    // 7. Update Corridor Index
     if (report.corridorName) {
       const cNorm = normalizeKey(report.corridorName);
       if (cNorm) {
@@ -312,10 +298,112 @@ export function saveReport(primaryKey: string, report: FieldIntelReport): FieldI
       }
     }
 
-    // Return the query matching the primary key context
     return getStoredReports(primaryKey);
   } catch (err) {
     console.error("Failed to save field intelligence report", err);
     return [report];
   }
+}
+
+/**
+ * Asynchronously fetch crowdsourced intelligence from the central backend database.
+ * Updates local cache seamlessly across all devices (phone, laptop, tablet).
+ */
+export async function fetchReportsFromApi(query: PlaceReportQuery | TripReportQuery): Promise<FieldIntelReport[]> {
+  try {
+    const params: Record<string, any> = {};
+    if ("placeId" in query && query.placeId) params.place_id = query.placeId;
+    if ("placeSlug" in query && query.placeSlug) params.place_slug = query.placeSlug;
+    if ("placeName" in query && query.placeName) params.place_name = query.placeName;
+    if ("cityId" in query && query.cityId) params.city_id = query.cityId;
+    if ("cityName" in query && query.cityName) params.city_name = query.cityName;
+    if ("corridorName" in query && query.corridorName) params.corridor_name = query.corridorName;
+    if ("tripId" in query && query.tripId) params.trip_id = query.tripId;
+
+    const data = await intelApi.list(params);
+    if (data && Array.isArray(data.reports)) {
+      const reports: FieldIntelReport[] = data.reports.map((r: any) => ({
+        id: r.id,
+        placeId: r.place_id || undefined,
+        placeSlug: r.place_slug || undefined,
+        placeName: r.place_name,
+        corridorName: r.corridor_name,
+        cityId: r.city_id || undefined,
+        cityName: r.city_name || undefined,
+        tripId: r.trip_id || undefined,
+        reporterName: r.reporter_name,
+        verifiedInTrip: r.verified_in_trip,
+        roadCondition: r.road_condition,
+        fuelStatus: r.fuel_status,
+        atmStatus: r.atm_status,
+        note: r.note || undefined,
+        timestamp: r.created_at || r.timestamp || new Date().toISOString(),
+      }));
+
+      // Cache into localStorage for instant offline access
+      if (typeof window !== "undefined" && reports.length > 0) {
+        const existing = getAllReports();
+        const map = new Map<string, FieldIntelReport>();
+        for (const rep of [...reports, ...existing]) {
+          if (rep && rep.id && !map.has(rep.id)) {
+            map.set(rep.id, rep);
+          }
+        }
+        localStorage.setItem(MASTER_KEY, JSON.stringify(Array.from(map.values())));
+      }
+
+      return reports;
+    }
+  } catch (err) {
+    console.warn("Could not fetch reports from backend API, falling back to cached local storage:", err);
+  }
+
+  // Fallback to local cache if network/backend is unavailable
+  if ("tripId" in query) {
+    return getReportsForTrip(query as TripReportQuery);
+  } else {
+    return getReportsForPlace(query as PlaceReportQuery);
+  }
+}
+
+/**
+ * Universal broadcast: Saves to local storage and persists to the central database API.
+ */
+export async function submitReportToApi(report: FieldIntelReport, primaryKey: string): Promise<FieldIntelReport> {
+  // 1. Save locally for instantaneous zero-latency UI update
+  saveReport(primaryKey, report);
+
+  // 2. Persist to central backend database for cross-device synchronization
+  try {
+    const payload = {
+      place_id: report.placeId || null,
+      place_slug: report.placeSlug || null,
+      place_name: report.placeName,
+      corridor_name: report.corridorName,
+      city_id: report.cityId || null,
+      city_name: report.cityName || null,
+      trip_id: report.tripId || null,
+      reporter_name: report.reporterName || "Verified Explorer",
+      verified_in_trip: report.verifiedInTrip ?? true,
+      road_condition: report.roadCondition,
+      fuel_status: report.fuelStatus,
+      atm_status: report.atmStatus,
+      note: report.note || null,
+    };
+
+    const res = await intelApi.create(payload);
+    if (res && res.id) {
+      const serverReport: FieldIntelReport = {
+        ...report,
+        id: res.id,
+        timestamp: res.created_at || res.timestamp || report.timestamp,
+      };
+      saveReport(primaryKey, serverReport);
+      return serverReport;
+    }
+  } catch (err) {
+    console.error("Failed to broadcast report to backend database API:", err);
+  }
+
+  return report;
 }

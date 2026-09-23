@@ -22,6 +22,8 @@ import {
   getStoredReports,
   getReportsForTrip,
   saveReport,
+  fetchReportsFromApi,
+  submitReportToApi,
 } from "@/lib/corridorIntel";
 import {
   findPakistanLocation,
@@ -646,6 +648,25 @@ export default function TripDetailPage() {
     return waypoints;
   }, [trip]);
 
+  // Fetch latest database reports on load / waypoints change
+  useEffect(() => {
+    if (!tripId) return;
+    let active = true;
+    fetchReportsFromApi({
+      tripId,
+      waypoints: tripWaypoints,
+      cityId: trip?.city_id,
+      corridorName: routeMetrics.corridorName,
+    }).then((reports) => {
+      if (active && reports && reports.length > 0) {
+        setReportsVersion((v) => v + 1);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [tripId, tripWaypoints, trip?.city_id, routeMetrics.corridorName]);
+
   // Aggregated live crowdsourced reports across the entire expedition and its waypoints
   const fieldReports = useMemo(() => {
     return getReportsForTrip({
@@ -658,12 +679,12 @@ export default function TripDetailPage() {
 
   const uniqueTouristsCount = useMemo(() => {
     if (fieldReports.length === 0) return 0;
-    const contributorKeys = new Set(fieldReports.map((r) => r.tripId || r.id));
+    const contributorKeys = new Set(fieldReports.map((r) => r.reporterName || r.tripId || r.id));
     return Math.max(1, contributorKeys.size);
   }, [fieldReports]);
 
-  const handleAddIntelReport = (newReport: FieldIntelReport) => {
-    saveReport(tripId, newReport);
+  const handleAddIntelReport = async (newReport: FieldIntelReport) => {
+    await submitReportToApi(newReport, tripId);
     setReportsVersion((v) => v + 1);
   };
 

@@ -175,6 +175,17 @@ export const usersApi = {
   },
 };
 
+export const intelApi = {
+  list: async (params?: Record<string, any>) => {
+    const res = await api.get("/corridor-intel", { params });
+    return res.data;
+  },
+  create: async (data: any) => {
+    const res = await api.post("/corridor-intel", data);
+    return res.data;
+  },
+};
+
 export function getErrorMessage(err: any, fallback = "An error occurred"): string {
   const detail = err?.response?.data?.detail;
   if (!detail) return err?.message || fallback;
