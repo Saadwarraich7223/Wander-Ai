@@ -788,6 +788,7 @@ function PlannerContent() {
             start_date: startDate,
             end_date: endDateFormatted,
             transit_mode: transitMode,
+            vehicle_class: vehicleClass,
             lodging_style: lodgingStyle,
             interests: selectedInterests,
             anchor_place_id: preselectedPlace?.id || null,
@@ -894,6 +895,70 @@ function PlannerContent() {
       isMountain,
     };
   }, [routeMetrics.drivingDistanceKm, daysCount, destinationLocation, vehicleClass]);
+
+  // Real-time Constraint Solver & Feasibility Engine
+  const solverMetrics = useMemo(() => {
+    // 1. Budget Feasibility
+    const dailySubsistence =
+      travelStyle === "family" ? 8500 : travelStyle === "couple" ? 5500 : travelStyle === "crew" ? 10000 : 3200;
+    const minViableCost = fuelLogistics.estimatedFuelCostPkr + daysCount * dailySubsistence;
+    const isBudgetDeficit = budget < fuelLogistics.estimatedFuelCostPkr;
+    const isBudgetTight = budget < minViableCost && !isBudgetDeficit;
+    const isBudgetSurplus = budget >= minViableCost * 1.6;
+
+    // 2. Road / Vehicle Feasibility
+    const isHighElevation = (destinationLocation?.elevation_m || 0) > 2200;
+    const isOffroadDesert =
+      (destinationLocation?.district?.toLowerCase().includes("bahawalpur") ?? false) ||
+      (destinationLocation?.name?.toLowerCase().includes("cholistan") ?? false) ||
+      (destinationLocation?.name?.toLowerCase().includes("thar") ?? false);
+    const is4x4Required = (isHighElevation || isOffroadDesert) && vehicleClass === "sedan";
+
+    // 3. Pacing Feasibility
+    const dailyDrivingKm = routeMetrics.drivingDistanceKm / Math.max(1, daysCount);
+    const isPacingRushed = dailyDrivingKm > 380;
+    const isPacingRelaxed = dailyDrivingKm < 150 && daysCount >= 4;
+
+    const issuesCount =
+      (isBudgetDeficit || isBudgetTight ? 1 : 0) + (is4x4Required ? 1 : 0) + (isPacingRushed ? 1 : 0);
+    const allPassed = issuesCount === 0;
+
+    return {
+      allPassed,
+      issuesCount,
+      minViableCost,
+      budgetStatus: isBudgetDeficit ? "DEFICIT" : isBudgetTight ? "TIGHT" : isBudgetSurplus ? "SURPLUS" : "OK",
+      budgetColor: isBudgetDeficit
+        ? "text-red-700 border-red-300 bg-red-50 dark:bg-red-950/40"
+        : isBudgetTight
+        ? "text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-950/40"
+        : "text-emerald-800 border-outline-variant/60 bg-surface-container-lowest",
+      budgetIcon: isBudgetDeficit ? "error" : isBudgetTight ? "warning" : "check_circle",
+      budgetIconColor: isBudgetDeficit ? "text-red-600" : isBudgetTight ? "text-amber-600" : "text-emerald-600",
+
+      roadStatus: is4x4Required ? "4x4 REQ" : isOffroadDesert && vehicleClass === "suv_4x4" ? "4x4 READY" : "CLEAR",
+      roadColor: is4x4Required
+        ? "text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-950/40"
+        : "text-emerald-800 border-outline-variant/60 bg-surface-container-lowest",
+      roadIcon: is4x4Required ? "warning" : "check_circle",
+      roadIconColor: is4x4Required ? "text-amber-600" : "text-emerald-600",
+
+      pacingStatus: isPacingRushed ? "RUSHED" : isPacingRelaxed ? "RELAXED" : "FIT",
+      pacingColor: isPacingRushed
+        ? "text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-950/40"
+        : "text-emerald-800 border-outline-variant/60 bg-surface-container-lowest",
+      pacingIcon: isPacingRushed ? "schedule" : "check_circle",
+      pacingIconColor: isPacingRushed ? "text-amber-600" : "text-emerald-600",
+    };
+  }, [
+    budget,
+    fuelLogistics.estimatedFuelCostPkr,
+    daysCount,
+    travelStyle,
+    destinationLocation,
+    vehicleClass,
+    routeMetrics.drivingDistanceKm,
+  ]);
 
   return (
     <div className="bg-background text-on-surface antialiased font-sans selection:bg-secondary-container selection:text-on-secondary-container min-h-screen flex flex-col">
@@ -2015,7 +2080,7 @@ function PlannerContent() {
                   </div>
                 </div>
 
-                {/* Constraint Validator Checklist */}
+                {/* Dynamic Constraint Validator Checklist */}
                 <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant mb-4 space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-mono font-semibold">
                     <span className="text-on-surface flex items-center gap-1">
@@ -2024,26 +2089,50 @@ function PlannerContent() {
                       </span>{" "}
                       Constraint Solver Validation
                     </span>
-                    <span className="text-secondary">ALL PASSED</span>
+                    <span
+                      className={
+                        solverMetrics.allPassed
+                          ? "text-secondary font-bold"
+                          : "text-amber-700 font-bold"
+                      }
+                    >
+                      {solverMetrics.allPassed
+                        ? "ALL PASSED"
+                        : `${solverMetrics.issuesCount} ADVISOR${
+                            solverMetrics.issuesCount > 1 ? "IES" : "Y"
+                          }`}
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 text-[10px] font-mono">
-                    <div className="bg-surface-container-lowest p-1.5 rounded border border-outline-variant/60 flex items-center gap-1 text-emerald-800 font-semibold">
-                      <span className="material-symbols-outlined text-xs text-emerald-600">
-                        check_circle
+                    <div
+                      className={`p-1.5 rounded border flex items-center gap-1 font-semibold ${solverMetrics.budgetColor}`}
+                    >
+                      <span
+                        className={`material-symbols-outlined text-xs ${solverMetrics.budgetIconColor}`}
+                      >
+                        {solverMetrics.budgetIcon}
                       </span>
-                      <span>Budget: OK</span>
+                      <span>Budget: {solverMetrics.budgetStatus}</span>
                     </div>
-                    <div className="bg-surface-container-lowest p-1.5 rounded border border-outline-variant/60 flex items-center gap-1 text-emerald-800 font-semibold">
-                      <span className="material-symbols-outlined text-xs text-emerald-600">
-                        check_circle
+                    <div
+                      className={`p-1.5 rounded border flex items-center gap-1 font-semibold ${solverMetrics.roadColor}`}
+                    >
+                      <span
+                        className={`material-symbols-outlined text-xs ${solverMetrics.roadIconColor}`}
+                      >
+                        {solverMetrics.roadIcon}
                       </span>
-                      <span>Road: CLEAR</span>
+                      <span>Road: {solverMetrics.roadStatus}</span>
                     </div>
-                    <div className="bg-surface-container-lowest p-1.5 rounded border border-outline-variant/60 flex items-center gap-1 text-emerald-800 font-semibold">
-                      <span className="material-symbols-outlined text-xs text-emerald-600">
-                        check_circle
+                    <div
+                      className={`p-1.5 rounded border flex items-center gap-1 font-semibold ${solverMetrics.pacingColor}`}
+                    >
+                      <span
+                        className={`material-symbols-outlined text-xs ${solverMetrics.pacingIconColor}`}
+                      >
+                        {solverMetrics.pacingIcon}
                       </span>
-                      <span>Pacing: FIT</span>
+                      <span>Pacing: {solverMetrics.pacingStatus}</span>
                     </div>
                   </div>
                 </div>

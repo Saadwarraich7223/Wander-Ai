@@ -7,6 +7,9 @@ import { tripsApi, aiApi, placesApi, getErrorMessage } from "@/lib/api";
 import { Trip, ItineraryDay, ItineraryItem, PlaceSummary, TripExpense } from "@/types";
 import Navbar from "@/components/Navbar";
 import ExportDossierModal from "@/components/ExportDossierModal";
+import EmergencySOSModal from "@/components/EmergencySOSModal";
+import TerrainSafetySentinel from "@/components/TerrainSafetySentinel";
+import AltitudeAcclimatizationSentinel from "@/components/AltitudeAcclimatizationSentinel";
 import {
   findPakistanLocation,
   calculateRouteMetrics,
@@ -48,9 +51,11 @@ export default function TripDetailPage() {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [checkingInStopId, setCheckingInStopId] = useState<string | null>(null);
 
-  // Expense Logger states
+  // Expense Logger & Safety states
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showSOSModal, setShowSOSModal] = useState(false);
+  const [tripVehicle, setTripVehicle] = useState<"sedan" | "crossover" | "suv_4x4">("crossover");
   const [expenseCategory, setExpenseCategory] = useState<string>("Dining");
   const [expenseAmount, setExpenseAmount] = useState<number | "">("");
   const [expenseNotes, setExpenseNotes] = useState<string>("");
@@ -132,6 +137,10 @@ export default function TripDetailPage() {
 
       if (data.status === "active" || searchParams.get("mode") === "live") {
         setIsLiveMode(true);
+      }
+
+      if (data.preferences?.vehicle_class) {
+        setTripVehicle(data.preferences.vehicle_class as any);
       }
 
       // Expand first day by default
@@ -624,7 +633,8 @@ export default function TripDetailPage() {
     return loggedExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   }, [loggedExpenses]);
 
-  const remainingBudget = Math.max(0, (trip?.total_budget || 50000) - totalExpensesLogged);
+  const remainingBudget = (trip?.total_budget || 50000) - totalExpensesLogged;
+  const isBudgetOverrun = totalExpensesLogged > (trip?.total_budget || 50000);
   const budgetUsedPercent = Math.min(100, Math.round((totalExpensesLogged / (trip?.total_budget || 50000)) * 100));
 
   // Leaflet Map Initialization
@@ -951,6 +961,16 @@ export default function TripDetailPage() {
                     <span>Export</span>
                   </button>
 
+                  <button
+                    onClick={() => setShowSOSModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 text-xs font-bold transition-colors shadow-sm cursor-pointer border border-transparent"
+                    type="button"
+                    title="Emergency SOS & Medical Directory"
+                  >
+                    <span className="material-symbols-outlined text-base animate-pulse">sos</span>
+                    <span>SOS &amp; Clinics</span>
+                  </button>
+
                   {activeItinerary && (
                     <Link
                       href={`/explore?trip_id=${trip.id}`}
@@ -978,6 +998,57 @@ export default function TripDetailPage() {
                     <span className="material-symbols-outlined text-base">delete</span>
                     <span>Delete</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Integrated Expedition Route & Telemetry Micro-Bar */}
+              <div className="w-full pt-4 mt-5 border-t border-outline-variant/40 grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline material-symbols-outlined text-base text-secondary">explore</span>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-semibold block">
+                      Origin ➔ Destination
+                    </span>
+                    <span className="font-bold text-on-surface truncate block" title={`${originLoc.name} to ${destLoc.name}`}>
+                      {originLoc.name.split(" ")[0]} ➔ {destLoc.name.split(" ")[0]}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline material-symbols-outlined text-base text-secondary">alt_route</span>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-semibold block">
+                      Transit Vector
+                    </span>
+                    <span className="font-bold text-on-surface truncate block" title={routeMetrics.corridorName}>
+                      {routeMetrics.drivingDistanceKm} km · ~{routeMetrics.drivingTimeFormatted}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline material-symbols-outlined text-base text-secondary">landscape</span>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-semibold block">
+                      Elevation Profile
+                    </span>
+                    <span className="font-bold text-on-surface block">
+                      {originLoc.elevation_m}m ➔ {destLoc.elevation_m}m ({Math.abs(routeMetrics.elevationChangeMeters)}m Δ)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline material-symbols-outlined text-base text-emerald-600">check_circle</span>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant font-semibold block">
+                      Corridor Readiness
+                    </span>
+                    <span className="font-bold text-emerald-800 block">
+                      {routeMetrics.roadPassabilityPercent}% Passable
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1173,77 +1244,6 @@ export default function TripDetailPage() {
                 )}
               </div>
             )}
-
-            {/* Departure Origin Vector Card */}
-            <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm mb-6 border border-secondary/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-secondary/5 via-surface-container-lowest to-transparent">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-500/15 px-2 py-0.5 rounded-md">
-                    Trip Departure Origin Vector
-                  </span>
-                </div>
-                <p className="text-sm sm:text-base font-extrabold text-on-surface mt-0.5">
-                  Route Starts From: <span className="text-secondary font-black">{originLoc.name}</span> → <span className="text-on-surface">{destLoc.name}</span> ({days.length} Daily Clusters)
-                </p>
-                <p className="text-xs text-on-surface-variant">
-                  Spatial route vector calculated via {routeMetrics.corridorName} ({routeMetrics.drivingDistanceKm} km · ~{routeMetrics.drivingTimeFormatted}).
-                </p>
-              </div>
-
-              {activeItinerary && (
-                <Link
-                  href={`/explore?trip_id=${trip.id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer w-full sm:w-auto justify-center"
-                >
-                  <span className="material-symbols-outlined text-base">map</span>
-                  <span>View Departure Map</span>
-                </Link>
-              )}
-            </div>
-
-            {/* Elevation & Environmental Bar Indicator */}
-            <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm mb-6 sm:mb-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border border-outline-variant/50">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 w-full lg:w-auto">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
-                    <span className="material-symbols-outlined text-lg">landscape</span>
-                  </div>
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Elevation Gradient</div>
-                    <div className="font-display text-xs sm:text-sm font-semibold text-on-surface">
-                      {originLoc.elevation_m}m → {destLoc.elevation_m}m ({Math.abs(routeMetrics.elevationChangeMeters)}m Δ)
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
-                    <span className="material-symbols-outlined text-lg">schedule</span>
-                  </div>
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Pacing Index</div>
-                    <div className="font-display text-xs sm:text-sm font-semibold text-on-surface capitalize">Optimal Dynamic ({trip.pace})</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary shrink-0">
-                    <span className="material-symbols-outlined text-lg">explore</span>
-                  </div>
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-outline font-semibold">Corridor Readiness</div>
-                    <div className="font-display text-xs sm:text-sm font-semibold text-on-surface truncate">
-                      {routeMetrics.corridorName.split("/")[0]?.trim() || "National Highway"} • {routeMetrics.roadPassabilityPercent}% Passable
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 w-full lg:w-auto justify-start lg:justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-outline-variant/40">
-                <span className="text-[11px] sm:text-xs text-on-surface-variant font-medium">Synched with {destLoc.province} Regional Meteorological Bureau</span>
-                <span className="w-2 h-2 rounded-full bg-secondary shrink-0" />
-              </div>
-            </div>
 
             {/* MAIN TWO-COLUMN SPLIT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
@@ -1808,17 +1808,27 @@ export default function TripDetailPage() {
                     </div>
                     <div>
                       <span className="font-mono text-[9px] uppercase tracking-wider text-outline block">Logged Spent</span>
-                      <span className={`font-display font-bold text-xs sm:text-sm ${totalExpensesLogged > trip.total_budget ? "text-error" : "text-amber-600"}`}>
+                      <span className={`font-display font-bold text-xs sm:text-sm ${isBudgetOverrun ? "text-rose-600 font-extrabold" : "text-amber-600"}`}>
                         Rs. {(totalExpensesLogged / 1000).toFixed(1)}k
                       </span>
                     </div>
                     <div>
                       <span className="font-mono text-[9px] uppercase tracking-wider text-outline block">Remaining</span>
-                      <span className="font-display font-bold text-xs sm:text-sm text-emerald-700">
-                        Rs. {(remainingBudget / 1000).toFixed(1)}k
+                      <span className={`font-display font-bold text-xs sm:text-sm ${isBudgetOverrun ? "text-rose-600 font-extrabold" : "text-emerald-700"}`}>
+                        {isBudgetOverrun ? `-Rs. ${(Math.abs(remainingBudget) / 1000).toFixed(1)}k` : `Rs. ${(remainingBudget / 1000).toFixed(1)}k`}
                       </span>
                     </div>
                   </div>
+
+                  {/* Overrun Alert if Expenses Exceed Total Capital */}
+                  {isBudgetOverrun && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-950 flex items-start gap-2">
+                      <span className="material-symbols-outlined text-sm text-rose-700 shrink-0 mt-0.5">warning</span>
+                      <span className="leading-snug">
+                        <strong>Budget Deficit Alert:</strong> Logged spend exceeds total capital by <strong>Rs. {Math.abs(remainingBudget).toLocaleString()}</strong>.
+                      </span>
+                    </div>
+                  )}
 
                   {/* Budget Consumption Bar */}
                   <div className="space-y-1">
@@ -2104,6 +2114,39 @@ export default function TripDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* ==================== EXPEDITION SAFETY & TERRAIN SENTINELS (AT BOTTOM) ==================== */}
+            <section id="safety-sentinels" className="mt-8 pt-6 border-t border-outline-variant/40 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-display font-bold text-sm sm:text-base text-on-surface">
+                    Route Safety &amp; Expedition Logistics Sentinels
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-on-surface-variant font-medium">
+                    Verified vehicle clearance and climate acclimatization telemetry for {destLoc.name}.
+                  </p>
+                </div>
+                <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-surface-container text-secondary text-[10px] font-mono font-bold border border-secondary/20">
+                  REAL-TIME SENSORS ACTIVE
+                </span>
+              </div>
+
+              {/* Vehicle-Terrain Safety Sentinel */}
+              <TerrainSafetySentinel
+                userVehicle={tripVehicle}
+                days={days}
+                destinationName={destLoc.name}
+                onVehicleChange={(v) => setTripVehicle(v)}
+              />
+
+              {/* High-Altitude / Climate Acclimatization Sentinel */}
+              <AltitudeAcclimatizationSentinel
+                days={days}
+                originAltitudeMeters={originLoc.elevation_m || 500}
+                destinationName={destLoc.name}
+                onOpenSOSModal={() => setShowSOSModal(true)}
+              />
+            </section>
           </div>
         </div>
       </main>
@@ -2688,6 +2731,13 @@ export default function TripDetailPage() {
       {showExportModal && trip && (
         <ExportDossierModal trip={trip} onClose={() => setShowExportModal(false)} />
       )}
+
+      {/* Emergency SOS & Medical Directory Modal */}
+      <EmergencySOSModal
+        isOpen={showSOSModal}
+        onClose={() => setShowSOSModal(false)}
+        activeRegionName={destLoc.name}
+      />
 
 
       {/* ==================== FOOTER ==================== */}
