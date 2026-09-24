@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { SITE_URL, API_BASE_URL } from "@/lib/siteConfig";
+import { CURATED_ITINERARIES } from "@/lib/itinerariesData";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const currentDate = new Date();
@@ -14,6 +15,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${SITE_URL}/places`,
+      lastModified: currentDate,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_URL}/itineraries`,
       lastModified: currentDate,
       changeFrequency: "daily",
       priority: 0.9,
@@ -44,10 +51,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
+  // High-Intent Productized Itinerary Landing Routes
+  const itineraryRoutes: MetadataRoute.Sitemap = CURATED_ITINERARIES.map((itinerary) => ({
+    url: `${SITE_URL}/itineraries/${itinerary.slug}`,
+    lastModified: currentDate,
+    changeFrequency: "weekly" as const,
+    priority: 0.95,
+  }));
+
   // Dynamically query verified destination pages from backend
   let placeRoutes: MetadataRoute.Sitemap = [];
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/places?limit=100`, {
+    const res = await fetch(`${API_BASE_URL}/api/v1/places?limit=500`, {
       next: { revalidate: 3600 },
     });
     if (res.ok) {
@@ -56,15 +71,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const seenUrls = new Set<string>();
 
       items.forEach((place: any) => {
-        if (place?.id) {
-          const placeUrl = `${SITE_URL}/places/${place.id}`;
+        const slugOrId = place?.slug || place?.id;
+        if (slugOrId) {
+          const placeUrl = `${SITE_URL}/places/${slugOrId}`;
           if (!seenUrls.has(placeUrl)) {
             seenUrls.add(placeUrl);
             placeRoutes.push({
               url: placeUrl,
               lastModified: place.updated_at ? new Date(place.updated_at) : currentDate,
               changeFrequency: "weekly",
-              priority: 0.8,
+              priority: 0.9,
             });
           }
         }
@@ -74,5 +90,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.warn("Dynamic sitemap generation using static routes:", err);
   }
 
-  return [...staticRoutes, ...placeRoutes];
+  return [...staticRoutes, ...itineraryRoutes, ...placeRoutes];
 }

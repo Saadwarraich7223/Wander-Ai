@@ -80,6 +80,7 @@ export async function generateMetadata({
   const place = await fetchPlaceData(resolvedParams.id);
   const placeName = place.name || "Destination";
   const cityName = place.city?.name || place.city || "Pakistan";
+  const canonicalSlug = place.slug || resolvedParams.id;
   const desc =
     place.description?.slice(0, 160) ||
     `Complete travel guide, estimated costs, seasonality, and itinerary synthesis for ${placeName} in ${cityName}, Pakistan.`;
@@ -89,15 +90,25 @@ export async function generateMetadata({
     "https://lh3.googleusercontent.com/aida-public/AB6AXuAky2BntZW4gkilTOyaiD7E5EPAGPseUMIn8FQk5P-rlcUcyojZR5yj3i8j3uRTzkCVi3A2gRsux4uRF8PhB1MxYnGRMVcBmMzOAz6k7n5MsYfs8Vr_0CRi_ZnkptQ_gIRC1vA1OLLZyT5Qdxu9IhduBm1WSqIxE6bfMPBWXUD1xlvScKhQnvAFSXNiY1AiaVKBED75Bh8MR9Jexe-CSdM9EYARPKP-usB2K4Pg_1w9XmRTfbuIuw1a8w";
 
   return {
-    title: `${placeName} — Travel Guide, Route Planning & Itinerary`,
+    title: `${placeName}, ${cityName} — Tourism Guide, Timings & Itinerary | WanderAI`,
     description: desc,
+    keywords: [
+      placeName,
+      cityName,
+      `${placeName} travel guide`,
+      `${placeName} ticket price`,
+      `best time to visit ${placeName}`,
+      `places to visit in ${cityName}`,
+      "Pakistan tourism",
+      "Northern Pakistan travel",
+    ],
     alternates: {
-      canonical: `/places/${resolvedParams.id}`,
+      canonical: `/places/${canonicalSlug}`,
     },
     openGraph: {
-      title: `${placeName}, ${cityName} | WanderAI Pakistan Guide`,
+      title: `${placeName}, ${cityName} | WanderAI Pakistan Tourism Guide`,
       description: desc,
-      url: `${SITE_URL}/places/${resolvedParams.id}`,
+      url: `${SITE_URL}/places/${canonicalSlug}`,
       type: "article",
       images: [
         {
@@ -110,7 +121,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${placeName}, ${cityName} Travel Guide | WanderAI`,
+      title: `${placeName}, ${cityName} Tourism Guide | WanderAI`,
       description: desc,
       images: [imgUrl],
     },
@@ -128,6 +139,7 @@ export default async function PlaceDetailLayout({
   const place = await fetchPlaceData(resolvedParams.id);
   const placeName = place.name || "Destination";
   const cityName = place.city?.name || place.city || "Pakistan";
+  const canonicalSlug = place.slug || resolvedParams.id;
   const imgUrl =
     place.primary_image?.url ||
     place.image ||
@@ -138,9 +150,10 @@ export default async function PlaceDetailLayout({
       "@context": "https://schema.org",
       "@type": "TouristDestination",
       name: placeName,
+      alternateName: place.name_ur || undefined,
       description: place.description || `Travel and tourism guide for ${placeName}.`,
       image: imgUrl,
-      url: `${SITE_URL}/places/${resolvedParams.id}`,
+      url: `${SITE_URL}/places/${canonicalSlug}`,
       containedInPlace: {
         "@type": "AdministrativeArea",
         name: cityName,
@@ -177,7 +190,29 @@ export default async function PlaceDetailLayout({
           "@type": "ListItem",
           position: 3,
           name: placeName,
-          item: `${SITE_URL}/places/${resolvedParams.id}`,
+          item: `${SITE_URL}/places/${canonicalSlug}`,
+        },
+      ],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: `What is the best time to visit ${placeName}?`,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: `${placeName} in ${cityName} offers peak sightseeing windows during spring and autumn. Seasonal conditions vary by elevation${place.elevation_meters ? ` (${place.elevation_meters}m AMSL)` : ''}.`,
+          },
+        },
+        {
+          "@type": "Question",
+          name: `What are the vehicle access and entry requirements for ${placeName}?`,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: `Vehicle access: ${place.vehicle_access || 'Accessible by standard road vehicles'}. Pacing tier: ${place.activity_level || 'Moderate'}. Suitable for ${place.family_suitable ? 'families and vacationers' : 'guided adventurers'}.`,
+          },
         },
       ],
     },

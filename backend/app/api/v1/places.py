@@ -232,10 +232,20 @@ async def get_nearby_places(
 
 @router.get("/{place_id}", response_model=PlaceDetailResponse)
 async def get_place_detail(
-    place_id: uuid.UUID,
+    place_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    """Get full details of a specific place including tags and images."""
+    """Get full details of a specific place by UUID or semantic slug."""
+    is_uuid = False
+    parsed_uuid = None
+    try:
+        parsed_uuid = uuid.UUID(place_id)
+        is_uuid = True
+    except (ValueError, AttributeError):
+        is_uuid = False
+
+    filter_cond = Place.id == parsed_uuid if is_uuid else Place.slug == place_id
+
     query = (
         select(Place)
         .options(
@@ -243,10 +253,24 @@ async def get_place_detail(
             selectinload(Place.images),
             selectinload(Place.tags).selectinload(PlaceTag.tag),
         )
-        .filter(Place.id == place_id)
+        .filter(filter_cond)
     )
     result = await db.execute(query)
     place = result.scalar_one_or_none()
+
+    if not place and is_uuid:
+        # Fallback check slug in case a slug happens to look like a uuid or vice-versa
+        query_slug = (
+            select(Place)
+            .options(
+                selectinload(Place.category),
+                selectinload(Place.images),
+                selectinload(Place.tags).selectinload(PlaceTag.tag),
+            )
+            .filter(Place.slug == place_id)
+        )
+        result = await db.execute(query_slug)
+        place = result.scalar_one_or_none()
 
     if not place:
         raise HTTPException(

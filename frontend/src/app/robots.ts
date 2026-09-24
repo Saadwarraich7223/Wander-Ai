@@ -10,6 +10,8 @@ export default function robots(): MetadataRoute.Robots {
           "/",
           "/places",
           "/places/*",
+          "/itineraries",
+          "/itineraries/*",
           "/explore",
           "/planner",
           "/recommendations",
@@ -32,6 +34,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           "/",
           "/places/*",
+          "/itineraries/*",
         ],
       },
     ],

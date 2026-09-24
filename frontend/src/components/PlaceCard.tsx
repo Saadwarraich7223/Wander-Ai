@@ -89,11 +89,11 @@ function CompactCard({
 }) {
   const [saved, setSaved] = useState(false);
   const match = matchPercent(place);
-  const detailHref = `/places/${place.id}`;
+  const detailHref = `/places/${place.slug || place.id}`;
   const isDistrict = isDistrictType(cityName);
 
   const handleWarmCache = () => {
-    placesApi.prefetchPlace(place.id, place);
+    placesApi.prefetchPlace(place.slug || place.id, place);
   };
 
   return (
@@ -229,10 +229,10 @@ function CoverCard({
 }) {
   const [saved, setSaved] = useState(false);
   const match = matchPercent(place);
-  const detailHref = `/places/${place.id}`;
+  const detailHref = `/places/${place.slug || place.id}`;
 
   const handleWarmCache = () => {
-    placesApi.prefetchPlace(place.id, place);
+    placesApi.prefetchPlace(place.slug || place.id, place);
   };
 
   return (
@@ -330,10 +330,10 @@ function FeaturedCard({
 }) {
   const [saved, setSaved] = useState(false);
   const match = matchPercent(place);
-  const detailHref = `/places/${place.id}`;
+  const detailHref = `/places/${place.slug || place.id}`;
 
   const handleWarmCache = () => {
-    placesApi.prefetchPlace(place.id, place);
+    placesApi.prefetchPlace(place.slug || place.id, place);
   };
 
   return (

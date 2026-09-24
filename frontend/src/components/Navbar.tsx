@@ -24,6 +24,7 @@ type NavLink = {
 const NAV_LINKS: NavLink[] = [
   { href: "/explore", label: "Explore", icon: "explore" },
   { href: "/places", label: "Destinations", icon: "place" },
+  { href: "/itineraries", label: "Itineraries", icon: "alt_route" },
   { href: "/recommendations", label: "Recommendations", icon: "auto_awesome" },
   { href: "/assistant", label: "Assistant", icon: "smart_toy" },
 ];
@@ -95,6 +96,7 @@ export default function Navbar({
     if (href === "/explore") return pathname === "/explore" && hash !== "#map";
     if (href === "/places")
       return pathname === "/places" || pathname.startsWith("/places/");
+    if (href === "/itineraries") return pathname.startsWith("/itineraries");
     if (href === "/recommendations") return pathname === "/recommendations";
     return pathname === href || pathname.startsWith(href + "/");
   };

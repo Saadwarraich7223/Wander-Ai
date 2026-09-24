@@ -156,6 +156,11 @@ export default function PlaceDetailPage() {
         setPlace(placeRes);
         setLoading(false);
 
+        // Silently upgrade address bar URL to semantic slug if accessed via UUID
+        if (placeRes?.slug && placeId !== placeRes.slug && typeof window !== "undefined") {
+          window.history.replaceState(null, "", `/places/${placeRes.slug}`);
+        }
+
         const matchedCity = citiesRes.find((c: City) => c.id === placeRes.city_id) ?? null;
         setCity(matchedCity);
 
