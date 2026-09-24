@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Compass, Plus, Trash2, ShieldCheck, MapPin, RefreshCw, Edit3, Image as ImageIcon, Search, X, Check, ExternalLink, ShieldAlert } from "lucide-react";
 import { api, usersApi } from "@/lib/api";
 import { authStorage } from "@/lib/auth";
+import { sanitizeSearchQuery } from "@/lib/sanitize";
 import { PlaceSummary, User } from "@/types";
 
 interface EditModalState {
@@ -47,11 +48,22 @@ export default function AdminPage() {
         if (me) {
           const hasAdmin = Boolean(me.is_admin || me.role === "admin");
           setIsAdmin(hasAdmin);
+          if (hasAdmin) {
+            fetchPlaces();
+          }
         } else {
-          setIsAdmin(Boolean(user?.is_admin || user?.role === "admin"));
+          const hasAdmin = Boolean(user?.is_admin || user?.role === "admin");
+          setIsAdmin(hasAdmin);
+          if (hasAdmin) {
+            fetchPlaces();
+          }
         }
       } catch (err) {
-        setIsAdmin(Boolean(user?.is_admin || user?.role === "admin"));
+        const hasAdmin = Boolean(user?.is_admin || user?.role === "admin");
+        setIsAdmin(hasAdmin);
+        if (hasAdmin) {
+          fetchPlaces();
+        }
       } finally {
         setAuthLoading(false);
       }
@@ -83,10 +95,6 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchPlaces();
-  }, []);
 
   const handleOpenEdit = (place: PlaceSummary) => {
     setEditModal({

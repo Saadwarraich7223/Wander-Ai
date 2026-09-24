@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { placesApi, tripsApi } from "@/lib/api";
+import { authStorage } from "@/lib/auth";
+import { sanitizePayload } from "@/lib/sanitize";
 import { City, PlaceSummary } from "@/types";
 import Navbar from "@/components/Navbar";
 import CityAutocomplete from "@/components/CityAutocomplete";
@@ -756,6 +758,23 @@ function PlannerContent() {
   };
 
   const handleGenerate = async () => {
+    // Require authentication to generate and save a trip
+    const token = authStorage.getAccessToken();
+    if (!token) {
+      const currentParams = new URLSearchParams();
+      if (preselectedPlace?.id) currentParams.set("place_id", preselectedPlace.id);
+      if (preselectedPlace?.name) currentParams.set("place_name", preselectedPlace.name);
+      currentParams.set("days", daysCount.toString());
+      currentParams.set("budget", budget.toString());
+      currentParams.set("origin", originCity);
+      currentParams.set("destination", destination);
+      currentParams.set("pace", pace);
+      currentParams.set("style", travelStyle);
+      const redirectTarget = `/planner?${currentParams.toString()}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -774,7 +793,7 @@ function PlannerContent() {
       }
 
       if (matchedCityId) {
-        const payload = {
+        const payload = sanitizePayload({
           city_id: matchedCityId,
           title: preselectedPlace
             ? `${daysCount}-Day ${preselectedPlace.name} Expedition`
@@ -795,7 +814,7 @@ function PlannerContent() {
             route_distance_km: routeMetrics.drivingDistanceKm,
             route_corridor: routeMetrics.corridorName,
           },
-        };
+        });
 
         const createdTrip = await tripsApi.create(payload);
 

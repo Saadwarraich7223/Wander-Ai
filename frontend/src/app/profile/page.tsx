@@ -1258,7 +1258,7 @@ export default function UserProfilePage() {
                   <button
                     onClick={() => {
                       authStorage.clearAuth();
-                      router.push("/login");
+                      router.push("/");
                     }}
                     className="w-full mt-2 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-semibold text-xs cursor-pointer border border-red-200"
                     type="button"

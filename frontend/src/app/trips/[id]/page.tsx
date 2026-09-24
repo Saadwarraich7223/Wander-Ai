@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tripsApi, aiApi, placesApi, getErrorMessage } from "@/lib/api";
+import { authStorage } from "@/lib/auth";
 import { Trip, ItineraryDay, ItineraryItem, PlaceSummary, TripExpense } from "@/types";
 import Navbar from "@/components/Navbar";
 import ExportDossierModal from "@/components/ExportDossierModal";
@@ -126,8 +127,13 @@ export default function TripDetailPage() {
   const [drawerLoading, setDrawerLoading] = useState(false);
 
   useEffect(() => {
+    const token = authStorage.getAccessToken();
+    if (!token) {
+      router.push(`/login?redirect=/trips/${tripId}`);
+      return;
+    }
     if (tripId) fetchTrip();
-  }, [tripId]);
+  }, [tripId, router]);
 
   useEffect(() => {
     const fetchCandidatePlaces = async () => {

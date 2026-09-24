@@ -74,7 +74,7 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     authStorage.clearAuth();
-    router.push("/login");
+    router.push("/");
   };
 
   if (!currentUser) {

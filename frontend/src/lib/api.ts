@@ -45,9 +45,6 @@ api.interceptors.response.use(
           return api(originalRequest);
         } catch (refreshErr) {
           authStorage.clearAuth();
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
           return Promise.reject(refreshErr);
         }
       } else {

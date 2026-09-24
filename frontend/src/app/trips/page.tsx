@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { tripsApi, getErrorMessage } from "@/lib/api";
+import { authStorage } from "@/lib/auth";
+import { sanitizeSearchQuery } from "@/lib/sanitize";
 import { Trip } from "@/types";
 import Navbar from "@/components/Navbar";
 import {
@@ -24,8 +26,13 @@ export default function TripsPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
+    const token = authStorage.getAccessToken();
+    if (!token) {
+      router.push("/login?redirect=/trips");
+      return;
+    }
     fetchTrips();
-  }, []);
+  }, [router]);
 
   const fetchTrips = async () => {
     try {

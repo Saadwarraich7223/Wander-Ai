@@ -10,7 +10,7 @@ interface NavbarProps {
   currency?: "PKR" | "USD";
   onCurrencyChange?: (currency: "PKR" | "USD") => void;
   tripsCount?: number | null;
-  user?: { full_name?: string | null } | null;
+  user?: { name?: string | null; full_name?: string | null; email?: string | null; avatar_url?: string | null } | null;
   onPlanTrip?: () => void;
 }
 
@@ -46,13 +46,36 @@ export default function Navbar({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hash, setHash] = useState("");
-  const [currentUser, setCurrentUser] = useState<{ full_name?: string | null } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    name?: string | null;
+    full_name?: string | null;
+    email?: string | null;
+    avatar_url?: string | null;
+    is_admin?: boolean;
+    role?: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (user !== undefined) {
+    if (user !== undefined && user !== null) {
       setCurrentUser(user);
     } else {
-      setCurrentUser(authStorage.getUser());
+      const stored = authStorage.getUser();
+      setCurrentUser(stored);
+    }
+
+    // Refresh profile in background if access token is active
+    if (authStorage.getAccessToken()) {
+      import("@/lib/api").then(({ usersApi }) => {
+        usersApi
+          .getMe()
+          .then((me) => {
+            if (me) {
+              setCurrentUser(me);
+              authStorage.setUser(me);
+            }
+          })
+          .catch(() => {});
+      });
     }
   }, [user]);
 
@@ -80,17 +103,21 @@ export default function Navbar({
 
   const myTripsActive = pathname.startsWith("/trips");
 
-  const ctaBase =
-    "inline-flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs sm:text-sm font-semibold transition-all shadow-sm hover:shadow-glow hover:-translate-y-0.5 cursor-pointer whitespace-nowrap";
-  const ctaClass = ctaBase;
+  const ctaClass =
+    "inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-5 py-2 rounded-xl bg-secondary text-white hover:bg-secondary-dark font-display text-xs sm:text-sm font-semibold transition-all shadow-sm hover:shadow-glow hover:-translate-y-0.5 cursor-pointer whitespace-nowrap";
 
   const isLoggedIn = Boolean(
-    currentUser && (currentUser.full_name || (currentUser as any).id || (currentUser as any).email)
+    authStorage.getAccessToken() ||
+      (currentUser && (currentUser.name || currentUser.full_name || currentUser.email))
   );
 
   const isAdmin = Boolean(
     (currentUser as any)?.is_admin || (currentUser as any)?.role === "admin"
   );
+
+  const displayName =
+    currentUser?.name || currentUser?.full_name || currentUser?.email?.split("@")[0] || "Explorer";
+  const userInitial = displayName.charAt(0).toUpperCase();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 px-2.5 sm:px-8 py-2.5 sm:py-3.5 transition-all">
@@ -99,6 +126,7 @@ export default function Navbar({
         <Link
           className="shrink-0 focus:outline-none"
           href="/"
+          prefetch={true}
         >
           <span className="font-display font-bold text-lg sm:text-xl tracking-tight text-on-surface">
             Wander<span className="text-secondary">AI</span>
@@ -110,6 +138,7 @@ export default function Navbar({
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
+              prefetch={true}
               className={`${NAV_ITEM_BASE} ${
                 isActive(link.href, link.anchor)
                   ? NAV_ITEM_ACTIVE
@@ -165,24 +194,29 @@ export default function Navbar({
             </div>
           )}
 
-          <Link
-            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-              myTripsActive
-                ? "bg-surface-container-high text-on-surface"
-                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-            }`}
-            href="/trips"
-          >
-            <span>My Trips</span>
-            {tripsCount != null && (
-              <span className="px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold">
-                {tripsCount}
-              </span>
-            )}
-          </Link>
+          {/* My Trips — Displayed ONLY for Logged-In Users */}
+          {isLoggedIn && (
+            <Link
+              prefetch={true}
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                myTripsActive
+                  ? "bg-surface-container-high text-on-surface"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+              }`}
+              href="/trips"
+            >
+              <span>My Trips</span>
+              {tripsCount != null && (
+                <span className="px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold">
+                  {tripsCount}
+                </span>
+              )}
+            </Link>
+          )}
 
           {isAdmin && (
             <Link
+              prefetch={true}
               className="hidden md:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
               href="/admin"
               title="Destination Catalog & Admin Studio"
@@ -192,41 +226,47 @@ export default function Navbar({
             </Link>
           )}
 
+          {/* Plan Trip CTA — Always shows clear text label */}
           {onPlanTrip ? (
             <button onClick={onPlanTrip} className={ctaClass} type="button">
               <span className="material-symbols-outlined text-sm">auto_awesome</span>
-              <span className="hidden xs:inline">Plan Trip</span>
+              <span>Plan Trip</span>
             </button>
           ) : (
-            <Link href="/planner" className={ctaClass}>
+            <Link href="/planner" prefetch={true} className={ctaClass}>
               <span className="material-symbols-outlined text-sm">auto_awesome</span>
-              <span className="hidden xs:inline">Plan Trip</span>
+              <span>Plan Trip</span>
             </Link>
           )}
 
           {isLoggedIn ? (
             <Link
               href="/profile"
+              prefetch={true}
               className="flex items-center pl-1.5 border-l border-outline-variant/60 cursor-pointer group"
-              title={currentUser?.full_name || "Profile"}
+              title={displayName}
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-secondary text-white font-bold flex items-center justify-center text-xs shadow-sm group-hover:ring-2 group-hover:ring-secondary/40 transition-all">
-                {currentUser?.full_name ? currentUser.full_name.charAt(0).toUpperCase() : "U"}
-              </div>
+              {currentUser?.avatar_url ? (
+                <img
+                  src={currentUser.avatar_url}
+                  alt={displayName}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover group-hover:ring-2 group-hover:ring-secondary/40 transition-all"
+                />
+              ) : (
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-secondary text-white font-bold flex items-center justify-center text-xs shadow-sm group-hover:ring-2 group-hover:ring-secondary/40 transition-all">
+                  {userInitial}
+                </div>
+              )}
             </Link>
           ) : (
-            <div className="flex items-center gap-1 sm:gap-2 pl-1 border-l border-outline-variant/60">
+            <div className="flex items-center pl-1.5 border-l border-outline-variant/60">
               <Link
                 href="/login"
-                className="text-xs font-semibold text-on-surface-variant hover:text-on-surface px-2 py-1 rounded-lg hover:bg-surface-container transition-all whitespace-nowrap"
+                prefetch={true}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface-container hover:bg-secondary hover:text-white text-on-surface text-xs font-semibold transition-all shadow-xs whitespace-nowrap"
               >
-                Log In
-              </Link>
-              <Link
-                href="/register"
-                className="hidden sm:inline-flex items-center text-xs font-bold text-secondary bg-secondary/10 hover:bg-secondary/20 px-2.5 py-1 rounded-lg transition-all whitespace-nowrap"
-              >
-                Sign Up
+                <span className="material-symbols-outlined text-sm">login</span>
+                <span>Sign In</span>
               </Link>
             </div>
           )}
@@ -252,6 +292,7 @@ export default function Navbar({
             <Link
               key={link.href}
               href={link.href}
+              prefetch={true}
               onClick={closeDrawer}
               className={`py-2.5 px-3 rounded-xl transition-colors text-sm font-semibold flex items-center gap-2.5 ${
                 isActive(link.href, link.anchor)
@@ -268,27 +309,31 @@ export default function Navbar({
 
           <div className="h-px bg-outline-variant/60 my-1" />
 
-          <Link
-            href="/trips"
-            onClick={closeDrawer}
-            className={`py-2.5 px-3 rounded-xl transition-colors text-sm font-semibold ${
-              myTripsActive
-                ? "bg-surface-container text-on-surface"
-                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/60"
-            }`}
-          >
-            <span className="flex items-center justify-between">
-              <span className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-lg text-secondary">route</span>
-                <span>My Trips</span>
-              </span>
-              {tripsCount != null && (
-                <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
-                  {tripsCount}
+          {/* My Trips in Mobile Drawer — ONLY when logged in */}
+          {isLoggedIn && (
+            <Link
+              href="/trips"
+              prefetch={true}
+              onClick={closeDrawer}
+              className={`py-2.5 px-3 rounded-xl transition-colors text-sm font-semibold ${
+                myTripsActive
+                  ? "bg-surface-container text-on-surface"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/60"
+              }`}
+            >
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-lg text-secondary">route</span>
+                  <span>My Trips</span>
                 </span>
-              )}
-            </span>
-          </Link>
+                {tripsCount != null && (
+                  <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
+                    {tripsCount}
+                  </span>
+                )}
+              </span>
+            </Link>
+          )}
 
           {currency && onCurrencyChange && (
             <div className="flex items-center justify-between py-2 px-3 bg-surface-container-low rounded-xl text-xs font-semibold my-1">
@@ -324,6 +369,7 @@ export default function Navbar({
             <>
               <Link
                 href="/profile"
+                prefetch={true}
                 onClick={closeDrawer}
                 className="py-2.5 px-3 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container/60 flex items-center justify-between"
               >
@@ -331,11 +377,12 @@ export default function Navbar({
                   <span className="material-symbols-outlined text-lg text-secondary">person</span>
                   <span>My Profile</span>
                 </span>
-                <span className="text-xs text-on-surface-variant">{currentUser?.full_name || "Account"}</span>
+                <span className="text-xs text-on-surface-variant">{displayName}</span>
               </Link>
               {isAdmin && (
                 <Link
                   href="/admin"
+                  prefetch={true}
                   onClick={closeDrawer}
                   className="py-2.5 px-3 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-between"
                 >
@@ -348,22 +395,15 @@ export default function Navbar({
               )}
             </>
           ) : (
-            <div className="flex flex-col gap-1 my-1">
+            <div className="my-1">
               <Link
                 href="/login"
+                prefetch={true}
                 onClick={closeDrawer}
-                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container/60 flex items-center gap-2.5"
+                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-white bg-secondary hover:bg-secondary-dark flex items-center justify-center gap-2"
               >
-                <span className="material-symbols-outlined text-lg text-on-surface-variant">login</span>
-                <span>Log In</span>
-              </Link>
-              <Link
-                href="/register"
-                onClick={closeDrawer}
-                className="py-2.5 px-3 rounded-xl text-sm font-semibold text-secondary bg-secondary/10 hover:bg-secondary/20 flex items-center gap-2.5"
-              >
-                <span className="material-symbols-outlined text-lg text-secondary">person_add</span>
-                <span>Create Free Account</span>
+                <span className="material-symbols-outlined text-lg">login</span>
+                <span>Sign In to Account</span>
               </Link>
             </div>
           )}
@@ -383,6 +423,7 @@ export default function Navbar({
           ) : (
             <Link
               href="/planner"
+              prefetch={true}
               onClick={closeDrawer}
               className={`${ctaClass} w-full mt-2 py-3`}
             >

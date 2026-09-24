@@ -1,14 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
 import { authStorage } from "@/lib/auth";
+import { sanitizeEmail } from "@/lib/sanitize";
 import AuthShell from "@/components/auth/AuthShell";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+
+  // Validate redirect parameter to prevent open redirect vulnerabilities
+  const safeRedirect =
+    redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//") && !redirectParam.includes("/login")
+      ? redirectParam
+      : "/explore";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -21,14 +31,16 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
+    const cleanEmail = sanitizeEmail(email);
+
     try {
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api.post("/auth/login", { email: cleanEmail, password });
       authStorage.setTokens(res.data);
 
       const userRes = await api.get("/users/me");
       authStorage.setUser(userRes.data);
 
-      router.push("/recommendations");
+      router.push(safeRedirect);
     } catch (err) {
       setError(getErrorMessage(err, "Invalid email or password. Please try again."));
     } finally {
@@ -149,10 +161,25 @@ export default function LoginPage() {
       {/* Switch to Register */}
       <div className="text-center pt-3 text-xs text-on-surface-variant">
         <span>Don&apos;t have an account? </span>
-        <Link href="/register" className="font-bold text-secondary hover:underline">
+        <Link
+          href={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : "/register"}
+          className="font-bold text-secondary hover:underline"
+        >
           Create account
         </Link>
       </div>
     </AuthShell>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <span className="material-symbols-outlined text-3xl text-secondary animate-spin">progress_activity</span>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

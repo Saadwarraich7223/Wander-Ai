@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
 import { authStorage } from "@/lib/auth";
+import { sanitizeEmail, sanitizeText } from "@/lib/sanitize";
 import AuthShell from "@/components/auth/AuthShell";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+
+  const safeRedirect =
+    redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//") && !redirectParam.includes("/register")
+      ? redirectParam
+      : "/onboarding";
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,16 +37,19 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
 
-    try {
-      await api.post("/auth/register", { name: fullName, email, password });
+    const cleanName = sanitizeText(fullName);
+    const cleanEmail = sanitizeEmail(email);
 
-      const loginRes = await api.post("/auth/login", { email, password });
+    try {
+      await api.post("/auth/register", { name: cleanName, email: cleanEmail, password });
+
+      const loginRes = await api.post("/auth/login", { email: cleanEmail, password });
       authStorage.setTokens(loginRes.data);
 
       const userRes = await api.get("/users/me");
       authStorage.setUser(userRes.data);
 
-      router.push("/onboarding");
+      router.push(safeRedirect);
     } catch (err) {
       setError(getErrorMessage(err, "Registration failed. Please check your inputs."));
     } finally {
@@ -187,10 +199,25 @@ export default function RegisterPage() {
       {/* Switch to Login */}
       <div className="text-center pt-3 text-xs text-on-surface-variant">
         <span>Already have an account? </span>
-        <Link href="/login" className="font-bold text-secondary hover:underline">
+        <Link
+          href={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login"}
+          className="font-bold text-secondary hover:underline"
+        >
           Sign in
         </Link>
       </div>
     </AuthShell>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <span className="material-symbols-outlined text-3xl text-secondary animate-spin">progress_activity</span>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
