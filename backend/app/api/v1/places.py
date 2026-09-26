@@ -7,8 +7,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
+from app.core.cache import places_cache
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
 from app.models.place import Category, City, Place, PlaceImage, PlaceTag, Tag
@@ -107,65 +108,74 @@ async def list_places(
     params: PlaceSearchParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    """List places with filtering and pagination."""
-    filters = []
+    """List places with filtering, pagination, and high-performance server-side caching."""
+    cache_key = (
+        f"list:{params.q or ''}:{params.city_id or ''}:{params.category_id or ''}:"
+        f"{params.indoor_outdoor or ''}:{params.family_suitable}:{params.activity_level or ''}:"
+        f"{params.cost_min}:{params.cost_max}:{params.page}:{params.limit}"
+    )
 
-    if params.q:
-        pattern = f"%{params.q}%"
-        filters.append(
-            or_(
-                Place.name.ilike(pattern),
-                Place.description.ilike(pattern),
-                Place.address.ilike(pattern),
+    async def _fetch():
+        filters = []
+
+        if params.q:
+            pattern = f"%{params.q}%"
+            filters.append(
+                or_(
+                    Place.name.ilike(pattern),
+                    Place.description.ilike(pattern),
+                    Place.address.ilike(pattern),
+                )
+            )
+        if params.city_id:
+            filters.append(Place.city_id == params.city_id)
+        if params.category_id:
+            filters.append(Place.category_id == params.category_id)
+        if params.indoor_outdoor:
+            filters.append(Place.indoor_outdoor == params.indoor_outdoor)
+        if params.family_suitable is not None:
+            filters.append(Place.family_suitable == params.family_suitable)
+        if params.activity_level:
+            filters.append(Place.activity_level == params.activity_level)
+        if params.cost_min is not None:
+            filters.append(Place.estimated_cost_min >= params.cost_min)
+        if params.cost_max is not None:
+            filters.append(Place.estimated_cost_max <= params.cost_max)
+
+        # Count total directly
+        count_query = select(func.count(Place.id))
+        if filters:
+            count_query = count_query.filter(*filters)
+        total_res = await db.execute(count_query)
+        total = total_res.scalar_one()
+
+        # Query items with joined category and selectinloaded images (single round-trip optimization)
+        query = (
+            select(Place)
+            .options(
+                joinedload(Place.category),
+                selectinload(Place.images),
             )
         )
-    if params.city_id:
-        filters.append(Place.city_id == params.city_id)
-    if params.category_id:
-        filters.append(Place.category_id == params.category_id)
-    if params.indoor_outdoor:
-        filters.append(Place.indoor_outdoor == params.indoor_outdoor)
-    if params.family_suitable is not None:
-        filters.append(Place.family_suitable == params.family_suitable)
-    if params.activity_level:
-        filters.append(Place.activity_level == params.activity_level)
-    if params.cost_min is not None:
-        filters.append(Place.estimated_cost_min >= params.cost_min)
-    if params.cost_max is not None:
-        filters.append(Place.estimated_cost_max <= params.cost_max)
+        if filters:
+            query = query.filter(*filters)
 
-    # Count total directly without subquery overhead
-    count_query = select(func.count(Place.id))
-    if filters:
-        count_query = count_query.filter(*filters)
-    total_res = await db.execute(count_query)
-    total = total_res.scalar_one()
+        # Paginate and order by popularity
+        offset = (params.page - 1) * params.limit
+        query = query.order_by(Place.popularity_score.desc()).offset(offset).limit(params.limit)
+        result = await db.execute(query)
+        places = result.scalars().unique().all()
 
-    # Query items with eager loading
-    query = (
-        select(Place)
-        .options(
-            selectinload(Place.category),
-            selectinload(Place.images),
+        items = [_format_place_summary(p) for p in places]
+        return PaginatedResponse(
+            items=items,
+            total=total,
+            page=params.page,
+            limit=params.limit,
+            pages=math.ceil(total / params.limit) if total > 0 else 0,
         )
-    )
-    if filters:
-        query = query.filter(*filters)
 
-    # Paginate and order by popularity
-    offset = (params.page - 1) * params.limit
-    query = query.order_by(Place.popularity_score.desc()).offset(offset).limit(params.limit)
-    result = await db.execute(query)
-    places = result.scalars().all()
-
-    items = [_format_place_summary(p) for p in places]
-    return PaginatedResponse(
-        items=items,
-        total=total,
-        page=params.page,
-        limit=params.limit,
-        pages=math.ceil(total / params.limit) if total > 0 else 0,
-    )
+    return await places_cache.get_or_set(cache_key, _fetch, ttl_seconds=600)
 
 
 @router.get("/nearby", response_model=list[PlaceSummaryResponse])
@@ -185,7 +195,7 @@ async def get_nearby_places(
         query = (
             select(Place)
             .options(
-                selectinload(Place.category),
+                joinedload(Place.category),
                 selectinload(Place.images),
             )
             .filter(
@@ -204,7 +214,7 @@ async def get_nearby_places(
         ).limit(params.limit)
 
         result = await db.execute(query)
-        places = result.scalars().all()
+        places = result.scalars().unique().all()
     except Exception:
         # Fallback bounding-box filter if PostGIS extension functions are not loaded in SQLite/mock
         lat_delta = params.radius_km / 111.0
@@ -212,7 +222,7 @@ async def get_nearby_places(
         query = (
             select(Place)
             .options(
-                selectinload(Place.category),
+                joinedload(Place.category),
                 selectinload(Place.images),
             )
             .filter(
@@ -225,7 +235,7 @@ async def get_nearby_places(
         query = query.limit(params.limit)
 
         result = await db.execute(query)
-        places = result.scalars().all()
+        places = result.scalars().unique().all()
 
     return [_format_place_summary(p) for p in places]
 
@@ -235,50 +245,53 @@ async def get_place_detail(
     place_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    """Get full details of a specific place by UUID or semantic slug."""
-    is_uuid = False
-    parsed_uuid = None
-    try:
-        parsed_uuid = uuid.UUID(place_id)
-        is_uuid = True
-    except (ValueError, AttributeError):
+    """Get full details of a specific place by UUID or semantic slug with in-memory caching."""
+    async def _fetch():
         is_uuid = False
+        parsed_uuid = None
+        try:
+            parsed_uuid = uuid.UUID(place_id)
+            is_uuid = True
+        except (ValueError, AttributeError):
+            is_uuid = False
 
-    filter_cond = Place.id == parsed_uuid if is_uuid else Place.slug == place_id
+        filter_cond = Place.id == parsed_uuid if is_uuid else Place.slug == place_id
 
-    query = (
-        select(Place)
-        .options(
-            selectinload(Place.category),
-            selectinload(Place.images),
-            selectinload(Place.tags).selectinload(PlaceTag.tag),
-        )
-        .filter(filter_cond)
-    )
-    result = await db.execute(query)
-    place = result.scalar_one_or_none()
-
-    if not place and is_uuid:
-        # Fallback check slug in case a slug happens to look like a uuid or vice-versa
-        query_slug = (
+        query = (
             select(Place)
             .options(
-                selectinload(Place.category),
+                joinedload(Place.category),
                 selectinload(Place.images),
-                selectinload(Place.tags).selectinload(PlaceTag.tag),
+                selectinload(Place.tags).joinedload(PlaceTag.tag),
             )
-            .filter(Place.slug == place_id)
+            .filter(filter_cond)
         )
-        result = await db.execute(query_slug)
-        place = result.scalar_one_or_none()
+        result = await db.execute(query)
+        place = result.scalars().unique().scalar_one_or_none()
 
-    if not place:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Place not found",
-        )
+        if not place and is_uuid:
+            # Fallback check slug in case a slug happens to look like a uuid or vice-versa
+            query_slug = (
+                select(Place)
+                .options(
+                    joinedload(Place.category),
+                    selectinload(Place.images),
+                    selectinload(Place.tags).joinedload(PlaceTag.tag),
+                )
+                .filter(Place.slug == place_id)
+            )
+            result = await db.execute(query_slug)
+            place = result.scalars().unique().scalar_one_or_none()
 
-    return _format_place_detail(place)
+        if not place:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Place not found",
+            )
+
+        return _format_place_detail(place)
+
+    return await places_cache.get_or_set(f"detail:{place_id}", _fetch, ttl_seconds=600)
 
 
 @router.post("", response_model=PlaceDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -340,9 +353,10 @@ async def create_place(
             db.add(pt)
 
     await db.commit()
+    places_cache.clear()
 
     # Refetch full place with relationships
-    return await get_place_detail(place.id, db)
+    return await get_place_detail(str(place.id), db)
 
 
 @router.put("/{place_id}", response_model=PlaceDetailResponse)
@@ -356,13 +370,13 @@ async def update_place(
     stmt = (
         select(Place)
         .options(
-            selectinload(Place.category),
+            joinedload(Place.category),
             selectinload(Place.images),
         )
         .filter(Place.id == place_id)
     )
     res = await db.execute(stmt)
-    place = res.scalar_one_or_none()
+    place = res.scalars().unique().scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Place not found")
 
@@ -407,7 +421,8 @@ async def update_place(
             db.add(new_img)
 
     await db.commit()
-    return await get_place_detail(place.id, db)
+    places_cache.clear()
+    return await get_place_detail(str(place.id), db)
 
 
 @router.delete("/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -423,4 +438,5 @@ async def delete_place(
         raise HTTPException(status_code=404, detail="Place not found")
     await db.delete(place)
     await db.commit()
+    places_cache.clear()
 

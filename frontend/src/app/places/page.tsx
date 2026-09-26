@@ -208,9 +208,26 @@ export default function PlacesPage() {
 
   useEffect(() => {
     let active = true;
+
+    // 0ms instant display from persistent cache
+    const cachedPlaces = placesApi.getCachedPlacesList({ limit: 300 });
+    const cachedCities = placesApi.getCachedCities();
+    const cachedCats = placesApi.getCachedCategories();
+
+    if (cachedPlaces?.items && cachedPlaces.items.length > 0) {
+      setPlaces(cachedPlaces.items);
+      setLoading(false);
+    }
+    if (cachedCities && cachedCities.length > 0) {
+      setCities(cachedCities);
+    }
+    if (cachedCats && cachedCats.length > 0) {
+      setCategories(cachedCats);
+    }
+
     async function load() {
-      // Only show full-screen skeleton if we have no places in memory
-      if (places.length === 0) {
+      // Only show full-screen skeleton if we have no places in memory or cache
+      if (!cachedPlaces?.items?.length && places.length === 0) {
         setLoading(true);
       }
       setLoadError(false);
@@ -230,14 +247,14 @@ export default function PlacesPage() {
         }
         if (placesRes.status === "fulfilled" && placesRes.value?.items) {
           setPlaces(placesRes.value.items);
-        } else if (places.length === 0) {
+        } else if (places.length === 0 && !cachedPlaces?.items?.length) {
           setLoadError(true);
         }
         if (tripRes.status === "fulfilled" && Array.isArray(tripRes.value)) {
           setTrips(tripRes.value);
         }
       } catch {
-        if (active && places.length === 0) setLoadError(true);
+        if (active && places.length === 0 && !cachedPlaces?.items?.length) setLoadError(true);
       } finally {
         if (active) setLoading(false);
       }

@@ -13,6 +13,31 @@ from app.core.database import engine
 from app.models.base import Base
 
 
+import asyncio
+import logging
+
+async def _warmup_caches() -> None:
+    """Preload hot read endpoints into in-memory cache to ensure sub-millisecond response times."""
+    try:
+        from app.core.database import AsyncSessionLocal
+        from app.api.v1.places import list_places
+        from app.api.v1.cities import list_cities
+        from app.api.v1.categories import list_categories
+        from app.schemas.place import PlaceSearchParams
+
+        async with AsyncSessionLocal() as db:
+            # Warm up categories and cities
+            await list_categories(db=db)
+            await list_cities(db=db)
+            # Warm up default places queries (all 300 places, page 1)
+            await list_places(params=PlaceSearchParams(limit=300, page=1), db=db)
+            await list_places(params=PlaceSearchParams(limit=50, page=1), db=db)
+            await list_places(params=PlaceSearchParams(limit=10, page=1), db=db)
+        logging.info("🚀 [Cache Warmup] Hot endpoints preloaded successfully into MemoryCache.")
+    except Exception as e:
+        logging.warning(f"⚠️ [Cache Warmup] Cache warmup background task encountered notice: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
@@ -21,8 +46,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except Exception as e:
-        import logging
         logging.warning(f"Database initialization warning on startup: {e}")
+
+    # Launch cache pre-warming in background task
+    asyncio.create_task(_warmup_caches())
+
     yield
     # Shutdown actions (e.g. close client pools)
 

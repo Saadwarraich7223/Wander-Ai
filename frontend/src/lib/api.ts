@@ -55,7 +55,7 @@ api.interceptors.response.use(
   }
 );
 
-// --- High-Performance In-Memory Cache & In-Flight Request Deduplication ---
+// --- High-Performance Persistent Cache & In-Flight Request Deduplication ---
 interface CacheEntry<T> {
   data: T;
   expiry: number;
@@ -64,24 +64,72 @@ interface CacheEntry<T> {
 const memoryCache = new Map<string, CacheEntry<any>>();
 const inFlightRequests = new Map<string, Promise<any>>();
 
+const STORAGE_PREFIX = "wander_cache_";
+
 function getFromCache<T>(key: string): T | null {
+  // 1. Check in-memory map
   const entry = memoryCache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiry) {
+  if (entry) {
+    if (Date.now() <= entry.expiry) {
+      return entry.data as T;
+    }
     memoryCache.delete(key);
-    return null;
   }
-  return entry.data as T;
+
+  // 2. Check persistent session storage fallback for instant 0ms loads
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      const item = window.sessionStorage.getItem(STORAGE_PREFIX + key);
+      if (item) {
+        const parsed: CacheEntry<T> = JSON.parse(item);
+        if (Date.now() <= parsed.expiry) {
+          memoryCache.set(key, parsed);
+          return parsed.data;
+        } else {
+          window.sessionStorage.removeItem(STORAGE_PREFIX + key);
+        }
+      }
+    } catch {
+      // Ignore quota/parsing issues
+    }
+  }
+
+  return null;
 }
 
 function setInCache<T>(key: string, data: T, ttlMs: number): void {
-  memoryCache.set(key, { data, expiry: Date.now() + ttlMs });
+  const entry: CacheEntry<T> = { data, expiry: Date.now() + ttlMs };
+  memoryCache.set(key, entry);
+
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      window.sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(entry));
+    } catch {
+      // Ignore quota issues
+    }
+  }
 }
 
 function invalidateCache(keyPrefix: string): void {
   for (const key of memoryCache.keys()) {
     if (key.startsWith(keyPrefix)) {
       memoryCache.delete(key);
+    }
+  }
+
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      const prefix = STORAGE_PREFIX + keyPrefix;
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.sessionStorage.length; i++) {
+        const k = window.sessionStorage.key(i);
+        if (k && k.startsWith(prefix)) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => window.sessionStorage.removeItem(k));
+    } catch {
+      // Ignore
     }
   }
 }
@@ -215,6 +263,10 @@ export const placesApi = {
   },
   getCachedPlace: (id: string) => {
     return getFromCache<any>(`places:item:${id}`);
+  },
+  getCachedPlacesList: (params?: Record<string, any>) => {
+    const key = `places:list:${params ? JSON.stringify(params) : "default"}`;
+    return getFromCache<{ items: any[]; total: number }>(key);
   },
   seedPlaceCache: (place: any) => {
     if (!place) return;

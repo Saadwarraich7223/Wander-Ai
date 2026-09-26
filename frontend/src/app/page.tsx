@@ -399,9 +399,29 @@ export default function HomePage() {
     const currentUser = authStorage.getUser();
     setUser(currentUser);
 
+    // 0ms instant display from persistent cache
+    const cached12 = placesApi.getCachedPlacesList({ limit: 12 });
+    const cached300 = placesApi.getCachedPlacesList({ limit: 300 });
+    const initialCached = cached12?.items?.length ? cached12.items : cached300?.items?.slice(0, 12);
+    const cachedCities = placesApi.getCachedCities();
+    const cachedCats = placesApi.getCachedCategories();
+
+    if (initialCached && initialCached.length > 0) {
+      setPlaces(initialCached);
+      setLoadingPlaces(false);
+    }
+    if (cachedCities && cachedCities.length > 0) {
+      setCities(cachedCities);
+    }
+    if (cachedCats && cachedCats.length > 0) {
+      setCategories(cachedCats);
+    }
+
     async function loadData() {
       try {
-        setLoadingPlaces(true);
+        if (!initialCached?.length) {
+          setLoadingPlaces(true);
+        }
         // Fetch real backend places, categories, and cities
         const [placesRes, catRes, cityRes] = await Promise.allSettled([
           placesApi.list({ limit: 12 }),

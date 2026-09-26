@@ -8,9 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.cache import cities_cache
 from app.core.database import get_db
 from app.models.place import City
 from app.schemas.place import CityResponse
+from sqlalchemy.orm import joinedload
 
 router = APIRouter(prefix="/cities", tags=["Cities"])
 
@@ -21,9 +23,14 @@ async def list_cities(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """List all cities."""
-    query = select(City).options(selectinload(City.region)).order_by(City.name.asc())
-    result = await db.execute(query)
-    return result.scalars().all()
+    async def _fetch():
+        query = select(City).options(joinedload(City.region)).order_by(City.name.asc())
+        result = await db.execute(query)
+        cities = result.scalars().all()
+        # Pre-serialize to dict/models to be cache safe
+        return [CityResponse.model_validate(c) for c in cities]
+
+    return await cities_cache.get_or_set("all_cities", _fetch, ttl_seconds=1800)
 
 
 @router.get("/{slug}", response_model=CityResponse)
@@ -32,14 +39,19 @@ async def get_city(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Get a city by slug."""
-    query = (
-        select(City)
-        .options(selectinload(City.region))
-        .filter(City.slug == slug)
-    )
-    result = await db.execute(query)
-    city = result.scalar_one_or_none()
-    return city
+    async def _fetch():
+        query = (
+            select(City)
+            .options(joinedload(City.region))
+            .filter(City.slug == slug)
+        )
+        result = await db.execute(query)
+        city = result.scalar_one_or_none()
+        if not city:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="City not found")
+        return CityResponse.model_validate(city)
+
+    return await cities_cache.get_or_set(f"city:{slug}", _fetch, ttl_seconds=1800)
 
 
 @router.get("/{city_id}/weather", summary="Get city weather forecast")
