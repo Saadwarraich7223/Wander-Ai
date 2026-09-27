@@ -109,6 +109,11 @@ Thumbs.db
 desktop.ini
 .omo/
 .codegraph/
+.context/
+context/
+*.context.md
+*_context.md
+CONTEXT_LOCAL.md
 implementation_plan*
 ADMIN_PANEL_CONTEXT_AND_ROADMAP.md
 ADMIN_STUDIO_*.md
